@@ -1,0 +1,42 @@
+node_modules
+.env
+.env.local
+coverage
+coverage.json
+typechain
+typechain-types
+
+# Hardhat files
+cache
+artifacts
+
+# Build files
+dist
+build
+.next
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Gas reports
+gas-report.txt
+
+# Deployment artifacts
+deployments.json
+
+# Gemini/AI artifacts
+.gemini

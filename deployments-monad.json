@@ -1,0 +1,27 @@
+{
+  "network": "monad-testnet",
+  "chainId": 10143,
+  "deployedAt": "2026-01-13T19:17:42.288Z",
+  "deployer": "0x3319148cB4324b0fbBb358c93D52e0b7f3fe4bc9",
+  "contracts": {
+    "PrivacyDomainRegistry": {
+      "address": "0x30892966D7D4AA2A4db11c9D1e67710DdD5F737e",
+      "deployedAt": "2026-01-13T19:17:46.355Z"
+    },
+    "CommitmentRegistry": {
+      "address": "0x399F6232A83216F34623F8517217340DF9067fBb",
+      "deployedAt": "2026-01-13T19:17:49.571Z"
+    },
+    "StealthPaymentVault": {
+      "address": "0x78023B7FDA8acf600e0EE866418755c95CDaa94F",
+      "deployedAt": "2026-01-13T19:17:52.813Z"
+    },
+    "ZKAccessVerifier": {
+      "address": "0xa9f47927b79F74E74bAa9B186F6ed096f67C5DB0",
+      "deployedAt": "2026-01-13T19:17:56.065Z",
+      "constructorArgs": [
+        "0x399F6232A83216F34623F8517217340DF9067fBb"
+      ]
+    }
+  }
+}
