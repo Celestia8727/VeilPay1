@@ -13,21 +13,9 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Reduce console noise
-  logging: {
-    fetches: {
-      fullUrl: false,
-    },
-  },
-
   // Skip type checking during dev (faster HMR)
   typescript: {
     ignoreBuildErrors: process.env.NODE_ENV === 'development',
-  },
-
-  // Skip ESLint during dev
-  eslint: {
-    ignoreDuringBuilds: process.env.NODE_ENV === 'development',
   },
 };
 

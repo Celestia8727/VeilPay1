@@ -1,116 +1,130 @@
 /**
- * x402 Payment Protocol Utilities
+ * x402 Payment Protocol - Configuration
  * 
- * x402 Services:
- * 1. Priority Scan - Instant payment detection for your stealth addresses
- * 2. Gas Relay - Pay for gas to relay claim transactions
+ * Uses USDC with EIP-3009 TransferWithAuthorization for gasless payments.
+ * User signs authorization, server executes USDC transfer.
  */
 
 import { supabase } from './supabase'
 
+// USDC on Monad Testnet (EIP-3009 compatible)
+export const USDC_ADDRESS = '0x534b2f3A21130d7a60830c2Df862319e593943A3'
+export const USDC_DECIMALS = 6
+
 // x402 Configuration for Monad
 export const X402_CONFIG = {
-    network: 'monad-testnet',
+    // x402 protocol version
+    x402Version: 1,
+
+    // Network configuration
+    network: 'monad-testnet' as const,
     chainId: 10143,
-    currency: 'MON',
+
+    // Asset configuration (USDC)
+    currency: 'USDC',
+    asset: USDC_ADDRESS,
+    decimals: USDC_DECIMALS,
+
+    // USDC EIP-712 domain info (queried from contract: name() returns 'USDC')
+    assetName: 'USDC',
+    assetVersion: '2',
+
+    // RPC endpoint
     rpcUrl: process.env.NEXT_PUBLIC_MONAD_RPC_URL || 'https://testnet-rpc.monad.xyz',
+
     // Platform wallet that receives x402 payments
     platformAddress: process.env.NEXT_PUBLIC_PLATFORM_ADDRESS || '0x3319148cB4324b0fbBb358c93D52e0b7f3fe4bc9',
-    // Pricing for services
+
+    // Pricing for services (in USDC atomic units - 6 decimals)
     services: {
         priorityScan: {
-            amount: '0.001', // 0.001 MON for priority scan
+            amount: '10000', // 0.01 USDC
+            displayAmount: '0.01',
             slaSeconds: 5,
-            description: 'Instant payment detection'
+            description: 'Instant payment detection',
+            maxTimeoutSeconds: 300 // 5 minutes
         },
         gasRelay: {
-            amount: '0.002', // 0.002 MON for gas relay (covers gas + fee)
+            amount: '20000', // 0.02 USDC
+            displayAmount: '0.02',
             slaSeconds: 30,
-            description: 'Gas relay for private claiming'
+            description: 'Gas relay for private claiming',
+            maxTimeoutSeconds: 300
         }
     }
 }
 
-export interface X402Challenge {
-    error: string
-    resource: string
-    amount: string
-    currency: string
+// Payment Requirements type (x402 spec)
+export interface PaymentRequirements {
+    scheme: 'exact'
     network: string
-    chainId: number
-    paymentAddress: string
-    expiresIn: number
-    metadata: Record<string, any>
+    maxAmountRequired: string
+    asset: string
+    payTo: string
+    maxTimeoutSeconds: number
+    description: string
+    resource: string
+    mimeType: string
+    extra?: {
+        name?: string
+        version?: string
+    }
+}
+
+// x402 Challenge Response (402 response body)
+export interface X402Response {
+    x402Version: number
+    accepts: PaymentRequirements[]
+    error?: string
 }
 
 /**
- * x402 Payment Challenge Response
- * Returns the 402 response body for unpaid requests
+ * Create x402 Payment Requirements (402 response body)
+ * Returns the proper x402 format with accepts array
  */
-export function createPaymentChallenge(
+export function createPaymentRequirements(
     service: keyof typeof X402_CONFIG.services,
     resourcePath: string,
     metadata?: Record<string, any>
 ): {
     status: number
-    body: X402Challenge
+    body: X402Response
 } {
     const serviceConfig = X402_CONFIG.services[service]
+
+    const paymentRequirements: PaymentRequirements = {
+        scheme: 'exact',
+        network: X402_CONFIG.network,
+        maxAmountRequired: serviceConfig.amount,
+        asset: X402_CONFIG.asset,
+        payTo: X402_CONFIG.platformAddress,
+        maxTimeoutSeconds: serviceConfig.maxTimeoutSeconds,
+        description: serviceConfig.description,
+        resource: resourcePath,
+        mimeType: 'application/json',
+        extra: {
+            name: X402_CONFIG.assetName,
+            version: X402_CONFIG.assetVersion
+        }
+    }
 
     return {
         status: 402,
         body: {
-            error: 'payment_required',
-            resource: resourcePath,
-            amount: serviceConfig.amount,
-            currency: X402_CONFIG.currency,
-            network: X402_CONFIG.network,
-            chainId: X402_CONFIG.chainId,
-            paymentAddress: X402_CONFIG.platformAddress,
-            expiresIn: 300, // 5 minutes to pay
-            metadata: {
-                service: service,
-                description: serviceConfig.description,
-                slaSeconds: serviceConfig.slaSeconds,
-                ...metadata
-            }
+            x402Version: X402_CONFIG.x402Version,
+            accepts: [paymentRequirements],
+            error: 'payment_required'
         }
     }
 }
 
-/**
- * Verify x402 payment from X-PAYMENT header
- * Header format: x402 {txHash}
- */
-export async function verifyX402Payment(
-    paymentHeader: string | null,
-    expectedAmount: string,
-    maxAgeSeconds: number = 300
-): Promise<{
-    valid: boolean
-    paymentHash?: string
-    error?: string
-}> {
-    if (!paymentHeader) {
-        return { valid: false, error: 'No X-PAYMENT header provided' }
-    }
-
-    // Parse header: "x402 {txHash}"
-    const parts = paymentHeader.split(' ')
-    if (parts.length < 2 || parts[0].toLowerCase() !== 'x402') {
-        return { valid: false, error: 'Invalid X-PAYMENT header format' }
-    }
-
-    const txHash = parts[1]
-
-    // For demo, accept the tx hash and trust it
-    // In production, verify on-chain that:
-    // 1. Transaction exists
-    // 2. Amount >= expectedAmount
-    // 3. Recipient is platform address
-    // 4. Transaction is recent
-
-    return { valid: true, paymentHash: txHash }
+// Legacy function for backwards compatibility
+export function createPaymentChallenge(
+    service: keyof typeof X402_CONFIG.services,
+    resourcePath: string,
+    metadata?: Record<string, any>
+) {
+    return createPaymentRequirements(service, resourcePath, metadata)
 }
 
 /**
@@ -139,4 +153,25 @@ export async function recordX402Payment(
     } catch {
         return false
     }
+}
+
+/**
+ * Format USDC amount for display
+ */
+export function formatUsdcAmount(atomicAmount: string): string {
+    const amount = BigInt(atomicAmount)
+    const divisor = BigInt(10 ** USDC_DECIMALS)
+    const whole = amount / divisor
+    const fraction = amount % divisor
+    const fractionStr = fraction.toString().padStart(USDC_DECIMALS, '0').slice(0, 2)
+    return `${whole}.${fractionStr}`
+}
+
+/**
+ * Parse USDC amount from display format
+ */
+export function parseUsdcAmount(displayAmount: string): string {
+    const [whole, fraction = ''] = displayAmount.split('.')
+    const paddedFraction = fraction.padEnd(USDC_DECIMALS, '0').slice(0, USDC_DECIMALS)
+    return BigInt(whole + paddedFraction).toString()
 }

@@ -3,13 +3,23 @@
  * 
  * POST /api/x402/relay/gas
  * 
- * Sends gas to a stealth address OR relays a claim transaction.
- * Enables private claiming without linking main wallet to stealth addresses.
+ * Actual x402 implementation:
+ * 1. Returns 402 with payment requirements if no X-PAYMENT header
+ * 2. Verifies USDC TransferWithAuthorization signature  
+ * 3. Settles payment (executes USDC transfer)
+ * 4. Sends gas to stealth address
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createPaymentChallenge, verifyX402Payment, X402_CONFIG, recordX402Payment } from '@/lib/x402'
-import { ethers } from 'ethers'
+import { X402_CONFIG, createPaymentRequirements, recordX402Payment, PaymentRequirements } from '@/lib/x402'
+import {
+    decodePaymentHeader,
+    settleX402Payment,
+    encodeSettlementResponse,
+    getFacilitatorWallet,
+    getPublicClient
+} from '@/lib/x402-server'
+import { parseEther, formatEther } from 'viem'
 
 export async function POST(request: NextRequest) {
     try {
@@ -33,8 +43,9 @@ export async function POST(request: NextRequest) {
         const paymentHeader = request.headers.get('X-PAYMENT')
 
         if (!paymentHeader) {
-            // No payment - return 402 challenge
-            const challenge = createPaymentChallenge(
+            // No payment - return 402 with payment requirements
+            console.log('📋 x402: No payment header, returning 402')
+            const challenge = createPaymentRequirements(
                 'gasRelay',
                 '/api/x402/relay/gas',
                 {
@@ -47,73 +58,82 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(challenge.body, { status: 402 })
         }
 
-        // Verify the x402 payment
-        const verification = await verifyX402Payment(
-            paymentHeader,
-            X402_CONFIG.services.gasRelay.amount
+        // Decode the payment header
+        let paymentPayload
+        try {
+            paymentPayload = decodePaymentHeader(paymentHeader)
+        } catch (error) {
+            return NextResponse.json(
+                { error: 'Invalid X-PAYMENT header format' },
+                { status: 400 }
+            )
+        }
+
+        console.log('🔐 x402: Verifying payment authorization...')
+        console.log('   Payer:', paymentPayload.payload.authorization.from)
+
+        // Create payment requirements for verification
+        const paymentRequirements: PaymentRequirements = {
+            scheme: 'exact',
+            network: X402_CONFIG.network,
+            maxAmountRequired: X402_CONFIG.services.gasRelay.amount,
+            asset: X402_CONFIG.asset,
+            payTo: X402_CONFIG.platformAddress,
+            maxTimeoutSeconds: X402_CONFIG.services.gasRelay.maxTimeoutSeconds,
+            description: X402_CONFIG.services.gasRelay.description,
+            resource: '/api/x402/relay/gas',
+            mimeType: 'application/json',
+            extra: {
+                name: X402_CONFIG.assetName,
+                version: X402_CONFIG.assetVersion
+            }
+        }
+
+        // Settle the payment (verify + execute USDC transfer)
+        const settlement = await settleX402Payment(
+            paymentPayload,
+            paymentRequirements,
+            'gasRelay'
         )
 
-        if (!verification.valid) {
+        if (!settlement.success) {
+            console.log('❌ x402: Payment settlement failed:', settlement.errorReason)
             return NextResponse.json(
-                { error: 'Invalid payment', details: verification.error },
+                {
+                    error: 'Payment settlement failed',
+                    reason: settlement.errorReason
+                },
                 { status: 402 }
             )
         }
 
-        // Payment verified! Now perform gas relay
-        console.log('🚀 x402 Gas Relay - Payment verified:', verification.paymentHash)
+        console.log('✅ x402: Payment settled successfully!')
+        console.log('   Transaction:', settlement.transaction)
+
+        // Payment verified and settled! Now perform gas relay
+        console.log('🚀 x402 Gas Relay - Processing...')
         console.log('   Stealth address:', stealthAddress)
         console.log('   Relay type:', relayType)
 
-        // Check if we have a platform private key for relaying
-        const platformPrivateKey = process.env.PLATFORM_PRIVATE_KEY
-
-        if (!platformPrivateKey) {
-            // No private key - return success but note that relay is simulated
-            console.log('   ⚠️ No PLATFORM_PRIVATE_KEY - simulating relay')
-
-            // Record the x402 payment
-            if (verification.paymentHash) {
-                await recordX402Payment(
-                    verification.paymentHash,
-                    'gasRelay',
-                    X402_CONFIG.services.gasRelay.amount,
-                    userAddress || 'unknown'
-                )
-            }
-
-            return NextResponse.json({
-                status: 'success',
-                service: 'gasRelay',
-                mode: 'simulated',
-                message: 'Gas relay simulated (no PLATFORM_PRIVATE_KEY configured)',
-                paymentHash: verification.paymentHash,
-                stealthAddress,
-                relayType,
-                slaSeconds: X402_CONFIG.services.gasRelay.slaSeconds
-            })
-        }
-
-        // Actually perform the relay
         try {
-            const provider = new ethers.JsonRpcProvider(X402_CONFIG.rpcUrl)
-            const platformWallet = new ethers.Wallet(platformPrivateKey, provider)
+            const walletClient = getFacilitatorWallet()
+            const publicClient = getPublicClient()
 
             let relayTxHash: string
 
             if (relayType === 'sendGas') {
                 // Send gas to stealth address
-                const gasAmount = ethers.parseEther('0.001') // 0.001 MON for gas
+                const gasAmount = parseEther('0.001') // 0.001 MON for gas
 
-                console.log(`   Sending ${ethers.formatEther(gasAmount)} MON to ${stealthAddress}`)
+                console.log(`   Sending ${formatEther(gasAmount)} MON to ${stealthAddress}`)
 
-                const tx = await platformWallet.sendTransaction({
-                    to: stealthAddress,
+                const tx = await walletClient.sendTransaction({
+                    to: stealthAddress as `0x${string}`,
                     value: gasAmount
                 })
 
-                await tx.wait()
-                relayTxHash = tx.hash
+                await publicClient.waitForTransactionReceipt({ hash: tx })
+                relayTxHash = tx
 
                 console.log('   ✅ Gas sent:', relayTxHash)
             } else {
@@ -124,27 +144,30 @@ export async function POST(request: NextRequest) {
                 )
             }
 
-            // Record the x402 payment
-            if (verification.paymentHash) {
-                await recordX402Payment(
-                    verification.paymentHash,
-                    'gasRelay',
-                    X402_CONFIG.services.gasRelay.amount,
-                    userAddress || 'unknown'
-                )
-            }
-
-            return NextResponse.json({
+            const responseBody = {
                 status: 'success',
                 service: 'gasRelay',
                 mode: 'executed',
-                paymentHash: verification.paymentHash,
+                paymentTx: settlement.transaction,
+                payer: settlement.payer,
                 relayTxHash,
                 stealthAddress,
                 relayType,
                 gasAmount: '0.001',
                 slaSeconds: X402_CONFIG.services.gasRelay.slaSeconds
-            })
+            }
+
+            const response = NextResponse.json(responseBody)
+
+            // Add X-PAYMENT-RESPONSE header
+            response.headers.set('X-PAYMENT-RESPONSE', encodeSettlementResponse({
+                success: true,
+                transaction: settlement.transaction,
+                network: X402_CONFIG.network,
+                payer: settlement.payer
+            }))
+
+            return response
 
         } catch (relayError: any) {
             console.error('Relay error:', relayError)
@@ -170,7 +193,9 @@ export async function GET() {
         description: X402_CONFIG.services.gasRelay.description,
         pricing: {
             amount: X402_CONFIG.services.gasRelay.amount,
+            displayAmount: X402_CONFIG.services.gasRelay.displayAmount,
             currency: X402_CONFIG.currency,
+            asset: X402_CONFIG.asset,
             network: X402_CONFIG.network,
             chainId: X402_CONFIG.chainId
         },
@@ -178,6 +203,7 @@ export async function GET() {
             relayTimeSeconds: X402_CONFIG.services.gasRelay.slaSeconds
         },
         paymentAddress: X402_CONFIG.platformAddress,
+        x402Version: X402_CONFIG.x402Version,
         relayTypes: ['sendGas', 'relayTx (coming soon)']
     })
 }

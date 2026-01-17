@@ -55,14 +55,15 @@ export default function ScanPaymentsPage() {
     // x402 hook for premium services
     const {
         x402Fetch,
-        payChallenge,
+        signPaymentAuthorization,
         retryWithPayment,
         currentChallenge,
+        selectedRequirements,
         isPaymentPending,
         setCurrentChallenge
     } = useX402({
-        onPaymentSuccess: (txHash) => {
-            console.log('x402 payment successful:', txHash)
+        onPaymentSuccess: (signature) => {
+            console.log('x402 payment authorized:', signature.slice(0, 20) + '...')
         }
     })
 
@@ -330,16 +331,16 @@ export default function ScanPaymentsPage() {
         toast.success(message)
     }
 
-    // Handle x402 payment from paywall modal
+    // Handle x402 payment authorization from paywall modal
     async function handleX402Pay() {
-        const txHash = await payChallenge()
+        const paymentHeader = await signPaymentAuthorization()
 
-        if (txHash) {
+        if (paymentHeader) {
             setShowPaywall(false)
 
             try {
                 if (x402Service === 'priorityScan' && selectedDomain) {
-                    const data = await retryWithPayment('/api/x402/scan/priority', txHash, {
+                    const data = await retryWithPayment('/api/x402/scan/priority', paymentHeader, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -349,7 +350,7 @@ export default function ScanPaymentsPage() {
                     })
                     await processX402ScanResults(data)
                 } else if (x402Service === 'gasRelay' && pendingClaimPayment) {
-                    const data = await retryWithPayment('/api/x402/relay/gas', txHash, {
+                    const data = await retryWithPayment('/api/x402/relay/gas', paymentHeader, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1100,27 +1101,14 @@ export default function ScanPaymentsPage() {
 
             {/* x402 Payment Modal */}
             <PaywallModal
-                challenge={currentChallenge || {
-                    error: 'payment_required',
-                    resource: x402Service === 'priorityScan' ? '/api/x402/scan/priority' : '/api/x402/relay/gas',
-                    amount: x402Service === 'priorityScan' ? '0.001' : '0.002',
-                    currency: 'MON',
-                    network: 'monad-testnet',
-                    chainId: 10143,
-                    paymentAddress: '0x3319148cB4324b0fbBb358c93D52e0b7f3fe4bc9',
-                    expiresIn: 300,
-                    metadata: {
-                        service: x402Service,
-                        description: x402Service === 'priorityScan' ? 'Instant payment detection' : 'Gas relay for private claiming',
-                        slaSeconds: x402Service === 'priorityScan' ? 5 : 30
-                    }
-                }}
+                challenge={currentChallenge}
+                selectedRequirements={selectedRequirements}
                 isOpen={showPaywall}
                 onClose={() => {
                     setShowPaywall(false)
                     setCurrentChallenge(null)
                 }}
-                onPay={handleX402Pay}
+                onAuthorize={handleX402Pay}
                 isPaying={isPaymentPending}
             />
         </div>

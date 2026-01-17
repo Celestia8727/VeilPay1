@@ -3,9 +3,10 @@
 /**
  * x402 Demo Page
  * 
- * Demonstrates the x402 payment protocol for:
- * 1. Priority Scan - Instant payment detection
- * 2. Gas Relay - Private claiming with gas relay
+ * Demonstrates the actual x402 payment protocol:
+ * 1. User signs USDC TransferWithAuthorization (gasless!)
+ * 2. Server executes the USDC transfer
+ * 3. Service is provided instantly
  */
 
 import { useState } from 'react'
@@ -16,11 +17,12 @@ import { NavHeader } from '@/components/nav-header'
 import { GlassPanel } from '@/components/ui/glass-panel'
 import { NeonButton } from '@/components/ui/neon-button'
 import { TerminalText } from '@/components/ui/terminal-text'
-import { Shield, Loader2, Zap, Clock, CheckCircle, Search, Fuel } from 'lucide-react'
+import { Shield, Loader2, Zap, Clock, CheckCircle, Search, Fuel, DollarSign } from 'lucide-react'
 import { useX402 } from '@/hooks/use-x402'
 import { PaywallModal } from '@/components/x402/PaywallModal'
 import { toast } from 'sonner'
 import { formatEther } from 'viem'
+import { X402_CONFIG, formatUsdcAmount } from '@/lib/x402'
 
 export default function X402DemoPage() {
     const { address, isConnected } = useAccount()
@@ -30,17 +32,22 @@ export default function X402DemoPage() {
     const [showPaywall, setShowPaywall] = useState(false)
     const [stealthAddress, setStealthAddress] = useState('')
     const [domainHash, setDomainHash] = useState('')
+    const [pendingRequest, setPendingRequest] = useState<{
+        url: string
+        init: RequestInit
+    } | null>(null)
 
     const {
         x402Fetch,
-        payChallenge,
+        signPaymentAuthorization,
         retryWithPayment,
         currentChallenge,
+        selectedRequirements,
         isPaymentPending,
         setCurrentChallenge
     } = useX402({
-        onPaymentSuccess: (txHash) => {
-            console.log('Payment successful:', txHash)
+        onPaymentSuccess: (signature) => {
+            console.log('Payment authorization signed:', signature.slice(0, 20) + '...')
         }
     })
 
@@ -61,18 +68,25 @@ export default function X402DemoPage() {
         setResult(null)
 
         try {
-            const { data, paid } = await x402Fetch('/api/x402/scan/priority', {
+            const requestInit: RequestInit = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     domainHash,
                     userAddress: address
                 })
-            })
+            }
+
+            const { data, paid } = await x402Fetch('/api/x402/scan/priority', requestInit)
 
             if (!paid) {
+                // Store the pending request for retry after payment
+                setPendingRequest({
+                    url: '/api/x402/scan/priority',
+                    init: requestInit
+                })
                 setShowPaywall(true)
-                console.log('Payment required:', data)
+                console.log('Payment required - showing paywall')
             } else {
                 setResult(data)
                 toast.success(`Found ${data.paymentsFound} payments!`)
@@ -103,7 +117,7 @@ export default function X402DemoPage() {
         setResult(null)
 
         try {
-            const { data, paid } = await x402Fetch('/api/x402/relay/gas', {
+            const requestInit: RequestInit = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -111,11 +125,18 @@ export default function X402DemoPage() {
                     userAddress: address,
                     relayType: 'sendGas'
                 })
-            })
+            }
+
+            const { data, paid } = await x402Fetch('/api/x402/relay/gas', requestInit)
 
             if (!paid) {
+                // Store the pending request for retry after payment
+                setPendingRequest({
+                    url: '/api/x402/relay/gas',
+                    init: requestInit
+                })
                 setShowPaywall(true)
-                console.log('Payment required:', data)
+                console.log('Payment required - showing paywall')
             } else {
                 setResult(data)
                 toast.success('Gas relay successful!')
@@ -129,35 +150,35 @@ export default function X402DemoPage() {
         }
     }
 
-    // Handle payment from modal
-    async function handlePay() {
-        const txHash = await payChallenge()
+    // Handle payment authorization from modal
+    async function handleAuthorize() {
+        const paymentHeader = await signPaymentAuthorization()
 
-        if (txHash) {
+        if (paymentHeader && pendingRequest) {
             setShowPaywall(false)
 
             try {
-                const endpoint = activeService === 'priorityScan'
-                    ? '/api/x402/scan/priority'
-                    : '/api/x402/relay/gas'
+                toast.loading('Executing payment and fetching data...')
 
-                const bodyData = activeService === 'priorityScan'
-                    ? { domainHash, userAddress: address }
-                    : { stealthAddress, userAddress: address, relayType: 'sendGas' }
-
-                const data = await retryWithPayment(endpoint, txHash, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(bodyData)
-                })
-
-                setResult(data)
-                toast.success(activeService === 'priorityScan'
-                    ? `Found ${data.paymentsFound} payments!`
-                    : 'Gas relay successful!'
+                const data = await retryWithPayment(
+                    pendingRequest.url,
+                    paymentHeader,
+                    pendingRequest.init
                 )
+
+                toast.dismiss()
+                setResult(data)
+
+                if (activeService === 'priorityScan') {
+                    toast.success(`Found ${data.paymentsFound} payments!`)
+                } else {
+                    toast.success('Gas relay successful!')
+                }
+
+                setPendingRequest(null)
             } catch (error: any) {
-                toast.error('Request failed after payment')
+                toast.dismiss()
+                toast.error(error.message || 'Request failed after payment')
             }
         }
     }
@@ -185,9 +206,24 @@ export default function X402DemoPage() {
 
                             <p className="text-muted-foreground max-w-2xl mx-auto">
                                 Pay-per-use services using the x402 payment protocol.
-                                Instant payment, instant service.
+                                <span className="text-cyan-400 font-semibold"> Sign once, pay instantly with USDC - no gas required!</span>
                             </p>
                         </div>
+
+                        {/* Info Banner */}
+                        <GlassPanel className="p-4 bg-gradient-to-r from-cyan-500/10 to-purple-500/10">
+                            <div className="flex items-center gap-4">
+                                <div className="p-2 bg-green-500/20 rounded-lg">
+                                    <DollarSign className="w-6 h-6 text-green-400" />
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-green-400">Gasless USDC Payments</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Pay with USDC using just a signature. The server handles the transaction - you pay zero gas!
+                                    </p>
+                                </div>
+                            </div>
+                        </GlassPanel>
 
                         {/* Services Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -206,7 +242,9 @@ export default function X402DemoPage() {
                                     </div>
 
                                     <div className="p-3 bg-secondary/30 rounded-lg text-center">
-                                        <p className="text-2xl font-bold text-cyan-400">0.001 MON</p>
+                                        <p className="text-2xl font-bold text-cyan-400">
+                                            {X402_CONFIG.services.priorityScan.displayAmount} USDC
+                                        </p>
                                         <p className="text-xs text-muted-foreground">5 second SLA</p>
                                     </div>
 
@@ -253,7 +291,9 @@ export default function X402DemoPage() {
                                     </div>
 
                                     <div className="p-3 bg-secondary/30 rounded-lg text-center">
-                                        <p className="text-2xl font-bold text-purple-400">0.002 MON</p>
+                                        <p className="text-2xl font-bold text-purple-400">
+                                            {X402_CONFIG.services.gasRelay.displayAmount} USDC
+                                        </p>
                                         <p className="text-xs text-muted-foreground">30 second SLA</p>
                                     </div>
 
@@ -299,9 +339,22 @@ export default function X402DemoPage() {
                                     <TerminalText prefix="service">{result.service}</TerminalText>
                                     <TerminalText prefix="status">{result.status}</TerminalText>
 
-                                    {result.paymentHash && (
-                                        <TerminalText prefix="payment">
-                                            {result.paymentHash.slice(0, 20)}...
+                                    {result.paymentTx && (
+                                        <TerminalText prefix="usdc-tx">
+                                            <a
+                                                href={`https://testnet.monadexplorer.com/tx/${result.paymentTx}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-cyan-400 hover:underline"
+                                            >
+                                                {result.paymentTx.slice(0, 20)}...
+                                            </a>
+                                        </TerminalText>
+                                    )}
+
+                                    {result.payer && (
+                                        <TerminalText prefix="payer">
+                                            {result.payer.slice(0, 10)}...{result.payer.slice(-8)}
                                         </TerminalText>
                                     )}
 
@@ -325,14 +378,15 @@ export default function X402DemoPage() {
 
                                     {result.relayTxHash && (
                                         <TerminalText prefix="relay-tx">
-                                            {result.relayTxHash.slice(0, 20)}...
+                                            <a
+                                                href={`https://testnet.monadexplorer.com/tx/${result.relayTxHash}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-purple-400 hover:underline"
+                                            >
+                                                {result.relayTxHash.slice(0, 20)}...
+                                            </a>
                                         </TerminalText>
-                                    )}
-
-                                    {result.mode === 'simulated' && (
-                                        <p className="text-yellow-400 text-xs mt-2">
-                                            ⚠️ {result.message}
-                                        </p>
                                     )}
                                 </div>
                             </GlassPanel>
@@ -351,17 +405,17 @@ export default function X402DemoPage() {
                                 <div className="p-4 bg-secondary/20 rounded-lg">
                                     <div className="text-2xl mb-2">2️⃣</div>
                                     <p className="text-sm font-semibold">Get 402</p>
-                                    <p className="text-xs text-muted-foreground">Payment details returned</p>
+                                    <p className="text-xs text-muted-foreground">Payment requirements returned</p>
                                 </div>
-                                <div className="p-4 bg-secondary/20 rounded-lg">
-                                    <div className="text-2xl mb-2">3️⃣</div>
-                                    <p className="text-sm font-semibold">Pay Fee</p>
-                                    <p className="text-xs text-muted-foreground">Send crypto payment</p>
+                                <div className="p-4 bg-secondary/20 rounded-lg border border-cyan-500/30">
+                                    <div className="text-2xl mb-2">✍️</div>
+                                    <p className="text-sm font-semibold text-cyan-400">Sign Authorization</p>
+                                    <p className="text-xs text-muted-foreground">No gas, just sign!</p>
                                 </div>
                                 <div className="p-4 bg-secondary/20 rounded-lg">
                                     <div className="text-2xl mb-2">4️⃣</div>
                                     <p className="text-sm font-semibold">Get Service</p>
-                                    <p className="text-xs text-muted-foreground">Instant delivery!</p>
+                                    <p className="text-xs text-muted-foreground">USDC transferred, instant delivery!</p>
                                 </div>
                             </div>
                         </GlassPanel>
@@ -371,27 +425,15 @@ export default function X402DemoPage() {
 
             {/* Paywall Modal */}
             <PaywallModal
-                challenge={currentChallenge || {
-                    error: 'payment_required',
-                    resource: activeService === 'priorityScan' ? '/api/x402/scan/priority' : '/api/x402/relay/gas',
-                    amount: activeService === 'priorityScan' ? '0.001' : '0.002',
-                    currency: 'MON',
-                    network: 'monad-testnet',
-                    chainId: 10143,
-                    paymentAddress: '0x3319148cB4324b0fbBb358c93D52e0b7f3fe4bc9',
-                    expiresIn: 300,
-                    metadata: {
-                        service: activeService || 'priorityScan',
-                        description: activeService === 'priorityScan' ? 'Instant payment detection' : 'Gas relay for private claiming',
-                        slaSeconds: activeService === 'priorityScan' ? 5 : 30
-                    }
-                }}
+                challenge={currentChallenge}
+                selectedRequirements={selectedRequirements}
                 isOpen={showPaywall}
                 onClose={() => {
                     setShowPaywall(false)
                     setCurrentChallenge(null)
+                    setPendingRequest(null)
                 }}
-                onPay={handlePay}
+                onAuthorize={handleAuthorize}
                 isPaying={isPaymentPending}
             />
         </div>

@@ -1,30 +1,66 @@
 /**
  * x402 React Hook
  * 
- * Provides x402 payment handling for React components
- * Automatically detects 402 responses and triggers payment flow
+ * Provides actual x402 payment handling for React components.
+ * Uses EIP-712 signed TransferWithAuthorization for gasless USDC payments.
  */
+
+'use client'
 
 import { useState, useCallback } from 'react'
 import { useAccount, useWalletClient, usePublicClient } from 'wagmi'
-import { parseEther, formatEther } from 'viem'
+import { getAddress, toHex } from 'viem'
 import { toast } from 'sonner'
+import { X402_CONFIG, PaymentRequirements, X402Response, formatUsdcAmount } from '@/lib/x402'
 
-interface X402Challenge {
-    error: string
-    resource: string
-    amount: string
-    currency: string
+// EIP-712 types for TransferWithAuthorization
+const authorizationTypes = {
+    TransferWithAuthorization: [
+        { name: 'from', type: 'address' },
+        { name: 'to', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'validAfter', type: 'uint256' },
+        { name: 'validBefore', type: 'uint256' },
+        { name: 'nonce', type: 'bytes32' }
+    ]
+} as const
+
+interface PaymentPayload {
+    x402Version: number
+    scheme: 'exact'
     network: string
-    chainId: number
-    paymentAddress: string
-    expiresIn: number
-    metadata: Record<string, any>
+    payload: {
+        signature: string
+        authorization: {
+            from: string
+            to: string
+            value: string
+            validAfter: string
+            validBefore: string
+            nonce: string
+        }
+    }
 }
 
 interface UseX402Options {
     onPaymentSuccess?: (txHash: string) => void
     onPaymentError?: (error: Error) => void
+}
+
+/**
+ * Generate a random nonce for the authorization
+ */
+function createNonce(): `0x${string}` {
+    const randomBytes = new Uint8Array(32)
+    crypto.getRandomValues(randomBytes)
+    return toHex(randomBytes)
+}
+
+/**
+ * Encode payment payload to base64 for X-PAYMENT header
+ */
+function encodePaymentHeader(payload: PaymentPayload): string {
+    return btoa(JSON.stringify(payload))
 }
 
 export function useX402(options: UseX402Options = {}) {
@@ -33,7 +69,8 @@ export function useX402(options: UseX402Options = {}) {
     const publicClient = usePublicClient()
 
     const [isPaymentPending, setIsPaymentPending] = useState(false)
-    const [currentChallenge, setCurrentChallenge] = useState<X402Challenge | null>(null)
+    const [currentChallenge, setCurrentChallenge] = useState<X402Response | null>(null)
+    const [selectedRequirements, setSelectedRequirements] = useState<PaymentRequirements | null>(null)
 
     /**
      * Make an x402 fetch request
@@ -47,9 +84,14 @@ export function useX402(options: UseX402Options = {}) {
         const response = await fetch(url, init)
 
         if (response.status === 402) {
-            // Payment required
-            const challenge: X402Challenge = await response.json()
+            // Payment required - parse x402 response
+            const challenge: X402Response = await response.json()
             setCurrentChallenge(challenge)
+
+            // Select the first payment requirement (USDC)
+            if (challenge.accepts && challenge.accepts.length > 0) {
+                setSelectedRequirements(challenge.accepts[0])
+            }
 
             return { data: challenge, paid: false }
         }
@@ -60,15 +102,16 @@ export function useX402(options: UseX402Options = {}) {
     }, [])
 
     /**
-     * Pay the current x402 challenge
+     * Sign the payment authorization (EIP-712)
+     * This creates a TransferWithAuthorization signature for USDC
      */
-    const payChallenge = useCallback(async (): Promise<string | null> => {
-        if (!currentChallenge) {
-            toast.error('No payment challenge to pay')
+    const signPaymentAuthorization = useCallback(async (): Promise<string | null> => {
+        if (!selectedRequirements) {
+            toast.error('No payment requirements available')
             return null
         }
 
-        if (!walletClient || !publicClient || !isConnected) {
+        if (!walletClient || !address) {
             toast.error('Please connect your wallet first')
             return null
         }
@@ -76,46 +119,94 @@ export function useX402(options: UseX402Options = {}) {
         setIsPaymentPending(true)
 
         try {
-            const amount = parseEther(currentChallenge.amount)
+            // Create authorization parameters
+            const nonce = createNonce()
+            const now = Math.floor(Date.now() / 1000)
+            const validAfter = BigInt(now - 600) // Valid from 10 minutes ago
+            const validBefore = BigInt(now + selectedRequirements.maxTimeoutSeconds)
 
-            toast.loading(`Sending ${currentChallenge.amount} ${currentChallenge.currency}...`)
+            const authorization = {
+                from: getAddress(address),
+                to: getAddress(selectedRequirements.payTo),
+                value: BigInt(selectedRequirements.maxAmountRequired),
+                validAfter,
+                validBefore,
+                nonce
+            }
 
-            // Send payment to the platform address
-            const hash = await walletClient.sendTransaction({
-                to: currentChallenge.paymentAddress as `0x${string}`,
-                value: amount
+            // EIP-712 domain for USDC
+            const domain = {
+                name: selectedRequirements.extra?.name || X402_CONFIG.assetName,
+                version: selectedRequirements.extra?.version || X402_CONFIG.assetVersion,
+                chainId: X402_CONFIG.chainId,
+                verifyingContract: selectedRequirements.asset as `0x${string}`
+            }
+
+            const displayAmount = formatUsdcAmount(selectedRequirements.maxAmountRequired)
+            toast.loading(`Authorizing ${displayAmount} USDC payment...`)
+
+            // Sign the typed data (EIP-712) - this is just a signature, no transaction!
+            const signature = await walletClient.signTypedData({
+                domain,
+                types: authorizationTypes,
+                primaryType: 'TransferWithAuthorization',
+                message: authorization
             })
 
-            // Wait for confirmation
-            await publicClient.waitForTransactionReceipt({ hash })
-
             toast.dismiss()
-            toast.success(`Payment sent! Hash: ${hash.slice(0, 10)}...`)
+            toast.success('Payment authorized!')
 
-            options.onPaymentSuccess?.(hash)
+            // Create the payment payload
+            const paymentPayload: PaymentPayload = {
+                x402Version: X402_CONFIG.x402Version,
+                scheme: 'exact',
+                network: X402_CONFIG.network,
+                payload: {
+                    signature,
+                    authorization: {
+                        from: authorization.from,
+                        to: authorization.to,
+                        value: authorization.value.toString(),
+                        validAfter: authorization.validAfter.toString(),
+                        validBefore: authorization.validBefore.toString(),
+                        nonce
+                    }
+                }
+            }
 
-            return hash
+            // Encode as base64 for the X-PAYMENT header
+            const paymentHeader = encodePaymentHeader(paymentPayload)
+
+            options.onPaymentSuccess?.(signature)
+
+            return paymentHeader
 
         } catch (error: any) {
             toast.dismiss()
-            toast.error(error.message || 'Payment failed')
+
+            if (error.message?.includes('rejected')) {
+                toast.error('Payment authorization rejected')
+            } else {
+                toast.error(error.message || 'Failed to authorize payment')
+            }
+
             options.onPaymentError?.(error)
             return null
         } finally {
             setIsPaymentPending(false)
         }
-    }, [currentChallenge, walletClient, publicClient, isConnected, options])
+    }, [selectedRequirements, walletClient, address, options])
 
     /**
-     * Retry the original request with payment proof
+     * Retry the original request with payment header
      */
     const retryWithPayment = useCallback(async (
         url: string,
-        txHash: string,
+        paymentHeader: string,
         init?: RequestInit
     ): Promise<any> => {
         const headers = new Headers(init?.headers)
-        headers.set('X-PAYMENT', `x402 ${txHash}`)
+        headers.set('X-PAYMENT', paymentHeader)
 
         const response = await fetch(url, {
             ...init,
@@ -123,16 +214,18 @@ export function useX402(options: UseX402Options = {}) {
         })
 
         if (!response.ok) {
-            throw new Error(`Request failed: ${response.status}`)
+            const error = await response.json().catch(() => ({}))
+            throw new Error(error.error || `Request failed: ${response.status}`)
         }
 
         const data = await response.json()
         setCurrentChallenge(null) // Clear challenge after success
+        setSelectedRequirements(null)
         return data
     }, [])
 
     /**
-     * Full x402 flow: request -> pay if needed -> retry
+     * Full x402 flow: request -> sign authorization if needed -> retry
      */
     const x402Request = useCallback(async (
         url: string,
@@ -145,23 +238,38 @@ export function useX402(options: UseX402Options = {}) {
             return data
         }
 
-        // Need to pay
-        const txHash = await payChallenge()
-        if (!txHash) {
-            throw new Error('Payment was not completed')
+        // Need to sign payment authorization
+        const paymentHeader = await signPaymentAuthorization()
+        if (!paymentHeader) {
+            throw new Error('Payment authorization was not completed')
         }
 
-        // Retry with payment
-        return retryWithPayment(url, txHash, init)
-    }, [x402Fetch, payChallenge, retryWithPayment])
+        // Retry with payment header
+        return retryWithPayment(url, paymentHeader, init)
+    }, [x402Fetch, signPaymentAuthorization, retryWithPayment])
+
+    /**
+     * Get the display amount for the current challenge
+     */
+    const getDisplayAmount = useCallback((): string => {
+        if (!selectedRequirements) return '0.00'
+        return formatUsdcAmount(selectedRequirements.maxAmountRequired)
+    }, [selectedRequirements])
 
     return {
+        // Core functions
         x402Fetch,
         x402Request,
-        payChallenge,
+        signPaymentAuthorization,
         retryWithPayment,
+
+        // State
         isPaymentPending,
         currentChallenge,
-        setCurrentChallenge
+        selectedRequirements,
+        setCurrentChallenge,
+
+        // Helpers
+        getDisplayAmount
     }
 }

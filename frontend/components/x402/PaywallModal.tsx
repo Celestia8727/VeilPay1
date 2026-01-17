@@ -3,43 +3,36 @@
 /**
  * x402 Paywall Modal Component
  * 
- * Displays payment challenge and handles the payment flow
+ * Displays USDC payment authorization request.
+ * User signs EIP-712 authorization (no transaction, no gas).
  */
 
-import { useState } from 'react'
 import { GlassPanel } from '@/components/ui/glass-panel'
 import { NeonButton } from '@/components/ui/neon-button'
 import { TerminalText } from '@/components/ui/terminal-text'
-import { Loader2, Lock, Unlock, Zap, CreditCard } from 'lucide-react'
-
-interface X402Challenge {
-    error: string
-    resource: string
-    amount: string
-    currency: string
-    network: string
-    chainId: number
-    paymentAddress: string
-    expiresIn: number
-    metadata: Record<string, any>
-}
+import { Loader2, Lock, Unlock, Zap, Shield, Wallet } from 'lucide-react'
+import { X402Response, PaymentRequirements, formatUsdcAmount } from '@/lib/x402'
 
 interface PaywallModalProps {
-    challenge: X402Challenge
+    challenge: X402Response | null
+    selectedRequirements: PaymentRequirements | null
     isOpen: boolean
     onClose: () => void
-    onPay: () => Promise<void>
+    onAuthorize: () => Promise<void>
     isPaying: boolean
 }
 
 export function PaywallModal({
     challenge,
+    selectedRequirements,
     isOpen,
     onClose,
-    onPay,
+    onAuthorize,
     isPaying
 }: PaywallModalProps) {
-    if (!isOpen) return null
+    if (!isOpen || !selectedRequirements) return null
+
+    const displayAmount = formatUsdcAmount(selectedRequirements.maxAmountRequired)
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
@@ -53,41 +46,48 @@ export function PaywallModal({
                     </div>
 
                     <h2 className="text-xl font-bold text-primary">
-                        Payment Required
+                        Payment Authorization
                     </h2>
 
                     <p className="text-muted-foreground text-sm">
-                        {challenge.metadata?.description || 'This resource requires payment to access.'}
+                        {selectedRequirements.description}
                     </p>
 
                     {/* Payment Details */}
                     <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
                         <TerminalText prefix="amount">
-                            {challenge.amount} {challenge.currency}
+                            {displayAmount} USDC
                         </TerminalText>
                         <TerminalText prefix="network">
-                            {challenge.network}
+                            {selectedRequirements.network}
                         </TerminalText>
-                        <TerminalText prefix="service">
-                            {challenge.metadata?.service || 'Unknown'}
+                        <TerminalText prefix="recipient">
+                            {selectedRequirements.payTo.slice(0, 10)}...{selectedRequirements.payTo.slice(-8)}
                         </TerminalText>
-                        {challenge.metadata?.slaSeconds && (
-                            <TerminalText prefix="sla">
-                                {challenge.metadata.slaSeconds}s processing
-                            </TerminalText>
-                        )}
                     </div>
 
-                    {/* Features */}
+                    {/* Benefits */}
                     <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
-                            <Zap className="w-3 h-3 text-yellow-400" />
-                            Priority Processing
+                            <Shield className="w-3 h-3 text-green-400" />
+                            No Gas Required
                         </div>
                         <div className="flex items-center gap-1">
-                            <Unlock className="w-3 h-3 text-green-400" />
-                            Instant Access
+                            <Zap className="w-3 h-3 text-yellow-400" />
+                            Instant
                         </div>
+                        <div className="flex items-center gap-1">
+                            <Wallet className="w-3 h-3 text-cyan-400" />
+                            USDC
+                        </div>
+                    </div>
+
+                    {/* Info box */}
+                    <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 text-left">
+                        <p className="text-xs text-cyan-300">
+                            <span className="font-semibold">How it works:</span> You'll sign a payment authorization.
+                            The server will execute the USDC transfer for you - no gas fees on your end!
+                        </p>
                     </div>
 
                     {/* Actions */}
@@ -104,18 +104,18 @@ export function PaywallModal({
                         <NeonButton
                             variant="cyan"
                             className="flex-1"
-                            onClick={onPay}
+                            onClick={onAuthorize}
                             disabled={isPaying}
                         >
                             {isPaying ? (
                                 <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Paying...
+                                    Signing...
                                 </>
                             ) : (
                                 <>
-                                    <CreditCard className="w-4 h-4 mr-2" />
-                                    Pay {challenge.amount} {challenge.currency}
+                                    <Unlock className="w-4 h-4 mr-2" />
+                                    Authorize {displayAmount} USDC
                                 </>
                             )}
                         </NeonButton>
@@ -123,7 +123,7 @@ export function PaywallModal({
 
                     {/* Footer */}
                     <p className="text-xs text-muted-foreground">
-                        Payment expires in {Math.floor(challenge.expiresIn / 60)} minutes
+                        Authorization expires in 5 minutes
                     </p>
                 </div>
             </GlassPanel>

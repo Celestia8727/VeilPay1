@@ -3,12 +3,21 @@
  * 
  * POST /api/x402/scan/priority
  * 
- * 1. Instantly returns payments from the database
- * 2. Also scans recent blocks for any new transactions not yet indexed
+ * Actual x402 implementation:
+ * 1. Returns 402 with payment requirements if no X-PAYMENT header
+ * 2. Verifies USDC TransferWithAuthorization signature
+ * 3. Settles payment (executes USDC transfer)
+ * 4. Returns scan results
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createPaymentChallenge, verifyX402Payment, X402_CONFIG, recordX402Payment } from '@/lib/x402'
+import { X402_CONFIG, createPaymentRequirements, recordX402Payment, PaymentRequirements } from '@/lib/x402'
+import {
+    decodePaymentHeader,
+    verifyX402Payment,
+    settleX402Payment,
+    encodeSettlementResponse
+} from '@/lib/x402-server'
 import { supabase } from '@/lib/supabase'
 import { ethers } from 'ethers'
 
@@ -37,8 +46,9 @@ export async function POST(request: NextRequest) {
         const paymentHeader = request.headers.get('X-PAYMENT')
 
         if (!paymentHeader) {
-            // No payment - return 402 challenge
-            const challenge = createPaymentChallenge(
+            // No payment - return 402 with payment requirements
+            console.log('📋 x402: No payment header, returning 402')
+            const challenge = createPaymentRequirements(
                 'priorityScan',
                 '/api/x402/scan/priority',
                 {
@@ -50,23 +60,62 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(challenge.body, { status: 402 })
         }
 
-        // Verify the x402 payment
-        const verification = await verifyX402Payment(
-            paymentHeader,
-            X402_CONFIG.services.priorityScan.amount
+        // Decode the payment header
+        let paymentPayload
+        try {
+            paymentPayload = decodePaymentHeader(paymentHeader)
+        } catch (error) {
+            return NextResponse.json(
+                { error: 'Invalid X-PAYMENT header format' },
+                { status: 400 }
+            )
+        }
+
+        console.log('🔐 x402: Verifying payment authorization...')
+        console.log('   Payer:', paymentPayload.payload.authorization.from)
+
+        // Create payment requirements for verification
+        const paymentRequirements: PaymentRequirements = {
+            scheme: 'exact',
+            network: X402_CONFIG.network,
+            maxAmountRequired: X402_CONFIG.services.priorityScan.amount,
+            asset: X402_CONFIG.asset,
+            payTo: X402_CONFIG.platformAddress,
+            maxTimeoutSeconds: X402_CONFIG.services.priorityScan.maxTimeoutSeconds,
+            description: X402_CONFIG.services.priorityScan.description,
+            resource: '/api/x402/scan/priority',
+            mimeType: 'application/json',
+            extra: {
+                name: X402_CONFIG.assetName,
+                version: X402_CONFIG.assetVersion
+            }
+        }
+
+        // Settle the payment (verify + execute USDC transfer)
+        const settlement = await settleX402Payment(
+            paymentPayload,
+            paymentRequirements,
+            'priorityScan'
         )
 
-        if (!verification.valid) {
+        if (!settlement.success) {
+            console.log('❌ x402: Payment settlement failed:', settlement.errorReason)
+            console.log('   Full settlement result:', JSON.stringify(settlement, null, 2))
             return NextResponse.json(
-                { error: 'Invalid payment', details: verification.error },
+                {
+                    error: 'Payment settlement failed',
+                    reason: settlement.errorReason,
+                    payer: settlement.payer,
+                    details: `Settlement failed: ${settlement.errorReason}`
+                },
                 { status: 402 }
             )
         }
 
-        // Payment verified!
-        console.log('🚀 x402 Priority Scan - Payment verified:', verification.paymentHash)
-        console.log('   Domain hash:', domainHash)
+        console.log('✅ x402: Payment settled successfully!')
+        console.log('   Transaction:', settlement.transaction)
 
+        // Payment verified and settled! Now provide the service
         try {
             // STEP 1: Get last indexed block
             const { data: indexerState } = await supabase
@@ -155,16 +204,6 @@ export async function POST(request: NextRequest) {
 
             console.log(`   Total payments for domain: ${payments?.length || 0}`)
 
-            // Record the x402 payment
-            if (verification.paymentHash) {
-                await recordX402Payment(
-                    verification.paymentHash,
-                    'priorityScan',
-                    X402_CONFIG.services.priorityScan.amount,
-                    userAddress || 'unknown'
-                )
-            }
-
             // Transform to match expected format
             const formattedPayments = (payments || []).map(p => ({
                 merchantId: p.merchant_id,
@@ -179,17 +218,31 @@ export async function POST(request: NextRequest) {
                 claimed: p.claimed
             }))
 
-            return NextResponse.json({
+            // Create response with X-PAYMENT-RESPONSE header
+            const responseBody = {
                 status: 'success',
                 service: 'priorityScan',
-                paymentHash: verification.paymentHash,
+                paymentTx: settlement.transaction,
+                payer: settlement.payer,
                 source: 'database+freshScan',
                 newBlocksScanned: Math.max(0, currentBlock - lastIndexedBlock),
                 newPaymentsIndexed: newPaymentsFound,
                 paymentsFound: formattedPayments.length,
                 payments: formattedPayments,
                 slaSeconds: X402_CONFIG.services.priorityScan.slaSeconds
-            })
+            }
+
+            const response = NextResponse.json(responseBody)
+
+            // Add X-PAYMENT-RESPONSE header
+            response.headers.set('X-PAYMENT-RESPONSE', encodeSettlementResponse({
+                success: true,
+                transaction: settlement.transaction,
+                network: X402_CONFIG.network,
+                payer: settlement.payer
+            }))
+
+            return response
 
         } catch (scanError: any) {
             console.error('Scan error:', scanError)
@@ -215,13 +268,16 @@ export async function GET() {
         description: 'Instant database query + fresh blockchain scan',
         pricing: {
             amount: X402_CONFIG.services.priorityScan.amount,
+            displayAmount: X402_CONFIG.services.priorityScan.displayAmount,
             currency: X402_CONFIG.currency,
+            asset: X402_CONFIG.asset,
             network: X402_CONFIG.network,
             chainId: X402_CONFIG.chainId
         },
         sla: {
             scanTimeSeconds: X402_CONFIG.services.priorityScan.slaSeconds
         },
-        paymentAddress: X402_CONFIG.platformAddress
+        paymentAddress: X402_CONFIG.platformAddress,
+        x402Version: X402_CONFIG.x402Version
     })
 }
