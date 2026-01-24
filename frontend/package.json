@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "postinstall": "node scripts/cleanup-tests.js || echo 'Cleanup script not found, skipping...'"
   },
   "dependencies": {
     "@farcaster/miniapp-core": "^0.4.1",
