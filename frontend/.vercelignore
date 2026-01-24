@@ -1,0 +1,10 @@
+# Vercel Ignore - Exclude test files from deployment
+
+*.test.js
+*.test.ts
+*.test.tsx
+*.spec.js
+*.spec.ts
+*.spec.tsx
+**/__tests__/**
+**/test/**

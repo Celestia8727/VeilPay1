@@ -1,22 +1,27 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Optimize for faster development builds
-  experimental: {
-    // Enable optimized package imports - reduces bundle parsing time
-    optimizePackageImports: [
-      'lucide-react',
-      '@rainbow-me/rainbowkit',
-      'wagmi',
-      'viem',
-      'ethers'
-    ],
-  },
+  /* config options here */
+  webpack: (config, { isServer }) => {
+    // Exclude test files from the build
+    config.module.rules.push({
+      test: /\.test\.(js|jsx|ts|tsx)$/,
+      loader: 'ignore-loader'
+    });
 
-  // Skip type checking during dev (faster HMR)
-  typescript: {
-    ignoreBuildErrors: process.env.NODE_ENV === 'development',
+    // Exclude node_modules test directories
+    config.externals = config.externals || [];
+    if (isServer) {
+      config.externals.push({
+        'tap': 'commonjs tap',
+        'jest': 'commonjs jest',
+      });
+    }
+
+    return config;
   },
+  // Ignore test files during build
+  pageExtensions: ['tsx', 'ts', 'jsx', 'js'].filter(ext => !ext.includes('test')),
 };
 
 export default nextConfig;
