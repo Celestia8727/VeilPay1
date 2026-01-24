@@ -35,18 +35,55 @@ const mainLinks = [
 // Custom Wallet Button using Wagmi
 function WalletButton() {
   const { address, isConnected, chain } = useAccount()
-  const { connect, connectors } = useConnect()
+  const { connect, connectors, isPending, error } = useConnect()
   const { disconnect } = useDisconnect()
   const [showMenu, setShowMenu] = React.useState(false)
+
+  // Debug: Log connectors
+  React.useEffect(() => {
+    console.log('Available connectors:', connectors.map(c => ({ name: c.name, type: c.type })))
+  }, [connectors])
+
+  // Debug: Log connection error
+  React.useEffect(() => {
+    if (error) {
+      console.error('Connection error:', error)
+    }
+  }, [error])
+
+  const handleConnect = async () => {
+    try {
+      console.log('Attempting to connect...')
+
+      // Try to find the best connector
+      const injectedConnector = connectors.find(c => c.type === 'injected')
+      const farcasterConnector = connectors.find(c => c.name.toLowerCase().includes('farcaster'))
+
+      // Prefer injected (MetaMask) for browser, Farcaster for mini app
+      const connector = injectedConnector || farcasterConnector || connectors[0]
+
+      console.log('Using connector:', connector?.name, connector?.type)
+
+      if (connector) {
+        await connect({ connector })
+      } else {
+        console.error('No connectors available')
+        alert('No wallet connectors found. Please install MetaMask or use a compatible wallet.')
+      }
+    } catch (error) {
+      console.error('Failed to connect:', error)
+    }
+  }
 
   if (!isConnected) {
     return (
       <button
-        onClick={() => connect({ connector: connectors[0] })}
+        onClick={handleConnect}
+        disabled={isPending}
         type="button"
-        className="px-4 py-1.5 bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan font-mono text-xs uppercase tracking-wider hover:bg-neon-cyan/20 transition-all rounded-md"
+        className="px-4 py-1.5 bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan font-mono text-xs uppercase tracking-wider hover:bg-neon-cyan/20 transition-all rounded-md disabled:opacity-50"
       >
-        Connect
+        {isPending ? 'Connecting...' : 'Connect'}
       </button>
     )
   }
@@ -69,7 +106,7 @@ function WalletButton() {
       </button>
 
       {showMenu && (
-        <div className="absolute right-0 top-full mt-2 w-48 bg-background/95 backdrop-blur-xl border border-neon-cyan/20 rounded-xl p-2 shadow-2xl">
+        <div className="absolute right-0 top-full mt-2 w-48 bg-background/95 backdrop-blur-xl border border-neon-cyan/20 rounded-xl p-2 shadow-2xl z-50">
           <button
             onClick={() => {
               disconnect()

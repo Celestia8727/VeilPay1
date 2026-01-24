@@ -9,16 +9,31 @@ import { motion, AnimatePresence } from 'framer-motion';
 // Simple Wallet Button
 function WalletButton() {
     const { address, isConnected } = useAccount();
-    const { connect, connectors } = useConnect();
+    const { connect, connectors, isPending } = useConnect();
     const { disconnect } = useDisconnect();
+
+    const handleConnect = () => {
+        try {
+            const farcasterConnector = connectors.find(c => c.name.toLowerCase().includes('farcaster'));
+            const injectedConnector = connectors.find(c => c.type === 'injected');
+            const connector = farcasterConnector || injectedConnector || connectors[0];
+
+            if (connector) {
+                connect({ connector });
+            }
+        } catch (error) {
+            console.error('Failed to connect:', error);
+        }
+    };
 
     if (!isConnected) {
         return (
             <button
-                onClick={() => connect({ connector: connectors[0] })}
-                className="px-4 py-2 bg-cyan-500/20 border border-cyan-400/50 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-all font-medium"
+                onClick={handleConnect}
+                disabled={isPending}
+                className="px-4 py-2 bg-cyan-500/20 border border-cyan-400/50 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-all font-medium disabled:opacity-50"
             >
-                Connect Wallet
+                {isPending ? 'Connecting...' : 'Connect Wallet'}
             </button>
         );
     }
