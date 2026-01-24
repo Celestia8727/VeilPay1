@@ -2,8 +2,9 @@
 
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { injected } from 'wagmi/connectors';
+import { RainbowKitProvider, getDefaultWallets, darkTheme } from '@rainbow-me/rainbowkit';
 import farcasterConnector from '@farcaster/miniapp-wagmi-connector';
+import '@rainbow-me/rainbowkit/styles.css';
 
 // Define Monad Testnet
 export const monadTestnet = {
@@ -24,12 +25,19 @@ export const monadTestnet = {
     testnet: true,
 } as const;
 
-// Create wagmi config WITHOUT RainbowKit to avoid WalletConnect issues
+// Get default wallets from RainbowKit v1
+const { connectors } = getDefaultWallets({
+    appName: 'PrivateVeil',
+    projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID',
+    chains: [monadTestnet],
+});
+
+// Create wagmi config with RainbowKit v1 + Farcaster connector
 const config = createConfig({
     chains: [monadTestnet],
     connectors: [
         farcasterConnector(), // Farcaster wallet for mini app
-        injected(), // Browser wallets (MetaMask, etc.) for web
+        ...connectors, // RainbowKit default wallets
     ],
     transports: {
         [monadTestnet.id]: http('https://testnet-rpc.monad.xyz'),
@@ -43,7 +51,16 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     return (
         <WagmiProvider config={config}>
             <QueryClientProvider client={queryClient}>
-                {children}
+                <RainbowKitProvider
+                    chains={[monadTestnet]}
+                    theme={darkTheme({
+                        accentColor: '#00F5FF',
+                        accentColorForeground: '#0A0A0F',
+                        borderRadius: 'medium',
+                    })}
+                >
+                    {children}
+                </RainbowKitProvider>
             </QueryClientProvider>
         </WagmiProvider>
     );
