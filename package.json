@@ -18,8 +18,7 @@
     "indexer": "node start-indexer.js",
     "dev:indexer": "node start-indexer.js",
     "dev:frontend": "cd frontend && npm run dev",
-    "dev:all": "powershell -ExecutionPolicy Bypass -File ./run-all.ps1",
-    "demo": "node scripts/demo-e2e.js"
+    "dev:all": "powershell -ExecutionPolicy Bypass -File ./run-all.ps1"
   },
   "keywords": [
     "privacy",

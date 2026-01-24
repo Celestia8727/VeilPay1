@@ -12,9 +12,13 @@ import { Shield, Loader2, CheckCircle2, AlertCircle, Info } from 'lucide-react'
 import { CONTRACTS, REGISTRY_ABI } from '@/lib/contracts'
 import { generateDomainHash, derivePublicKeyFromWallet, formatHash } from '@/lib/crypto'
 import { getUserDomains, getUserSubscription, saveDomain, type Domain, type UserSubscription } from '@/lib/storage'
+import { useFarcaster } from '@/components/providers/FarcasterProvider'
+import { SafeAreaContainer } from '@/components/SafeAreaContainer'
+import { ShareDomainAction } from '@/components/FarcasterActions'
 import toast from 'react-hot-toast'
 
 export default function RegisterDomainPage() {
+    const { context, isSDKLoaded } = useFarcaster()
     const { address, isConnected } = useAccount()
     const { data: walletClient } = useWalletClient()
     const [domainName, setDomainName] = useState('')
@@ -201,206 +205,239 @@ export default function RegisterDomainPage() {
     }
 
     return (
-        <div className="min-h-screen">
-            <AnimatedBackground />
-            <ScanlineOverlay />
-            <NavHeader />
+        <SafeAreaContainer insets={context?.client.safeAreaInsets}>
+            <div className="min-h-screen">
+                <AnimatedBackground />
+                <ScanlineOverlay />
+                <NavHeader />
 
-            <main className="pt-32 px-4 sm:px-6 lg:px-8 pb-20">
-                <div className="max-w-3xl mx-auto">
-                    {/* Header */}
-                    <div className="mb-12 text-center">
-                        <h1 className="font-mono text-4xl sm:text-5xl font-bold tracking-[0.2em] mb-4 animate-flicker">
-                            <span className="neon-text-cyan">REGISTER DOMAIN</span>
-                        </h1>
-                        <TerminalText prefix="$">Create your privacy domain for stealth payments</TerminalText>
-                    </div>
-
-                    {/* Subscription Info */}
-                    {!isLoadingData && subscription && (
-                        <GlassPanel glow="green" className="p-6 mb-6">
-                            <div className="flex items-center justify-between flex-wrap gap-4">
-                                <div>
-                                    <TerminalText prefix="#">
-                                        Subscription: {subscription.tier?.tier_name}
-                                    </TerminalText>
-                                    <TerminalText prefix="limit">
-                                        {userDomains.length} / {subscription.tier?.domain_limit} domains used
-                                    </TerminalText>
-                                </div>
-                                {userDomains.length >= (subscription.tier?.domain_limit || 1) && (
-                                    <div className="flex items-center gap-2 text-neon-purple">
-                                        <Info className="w-5 h-5" />
-                                        <span className="font-mono text-sm">Limit reached - upgrade to register more</span>
+                <main className="pt-32 px-4 sm:px-6 lg:px-8 pb-20">
+                    <div className="max-w-3xl mx-auto">
+                        {/* Farcaster User Info */}
+                        {isSDKLoaded && context?.user && (
+                            <GlassPanel glow="purple" className="p-4 mb-6">
+                                <div className="flex items-center gap-3">
+                                    <img
+                                        src={context.user.pfpUrl}
+                                        alt={context.user.username}
+                                        className="w-12 h-12 rounded-full border-2 border-neon-purple"
+                                    />
+                                    <div className="flex-1">
+                                        <p className="font-mono text-sm text-neon-purple font-bold">
+                                            @{context.user.username}
+                                        </p>
+                                        <p className="font-mono text-xs text-muted-foreground">
+                                            FID: {context.user.fid} • {context.user.displayName}
+                                        </p>
                                     </div>
-                                )}
-                            </div>
-                        </GlassPanel>
-                    )}
+                                    <div className="px-3 py-1 bg-neon-purple/20 border border-neon-purple/50 rounded">
+                                        <p className="font-mono text-xs text-neon-purple">Farcaster Mini App</p>
+                                    </div>
+                                </div>
+                            </GlassPanel>
+                        )}
 
-                    {/* Registration Form */}
-                    <GlassPanel glow="cyan" className="p-8 space-y-6">
-                        {/* Domain Name Input */}
-                        <div>
-                            <label className="block font-mono text-sm text-muted-foreground mb-2 uppercase tracking-wider">
-                                Domain Name
-                            </label>
-                            <input
-                                type="text"
-                                value={domainName}
-                                onChange={(e) => setDomainName(e.target.value.toLowerCase())}
-                                placeholder="alice.veil"
-                                className="w-full px-4 py-3 bg-input border border-border text-foreground font-mono text-sm focus:outline-none focus:border-neon-cyan transition-colors"
-                                disabled={isGeneratingKeys || isPending || isConfirming}
-                            />
-                            <TerminalText prefix="#">
-                                Choose a unique identifier for receiving private payments
-                            </TerminalText>
+                        {/* Header */}
+                        <div className="mb-12 text-center">
+                            <h1 className="font-mono text-4xl sm:text-5xl font-bold tracking-[0.2em] mb-4 animate-flicker">
+                                <span className="neon-text-cyan">REGISTER DOMAIN</span>
+                            </h1>
+                            <TerminalText prefix="$">Create your privacy domain for stealth payments</TerminalText>
                         </div>
 
-                        {/* Generate Keys Button */}
-                        {!generatedKeys && (
-                            <NeonButton
-                                variant="cyan"
-                                size="lg"
-                                className="w-full"
-                                onClick={handleGenerateKeys}
-                                disabled={!domainName || isGeneratingKeys}
-                            >
-                                {isGeneratingKeys ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                                        Generating Keys...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Shield className="w-5 h-5 mr-2" />
-                                        Generate Keys
-                                    </>
-                                )}
-                            </NeonButton>
+                        {/* Subscription Info */}
+                        {!isLoadingData && subscription && (
+                            <GlassPanel glow="green" className="p-6 mb-6">
+                                <div className="flex items-center justify-between flex-wrap gap-4">
+                                    <div>
+                                        <TerminalText prefix="#">
+                                            Subscription: {subscription.tier?.tier_name}
+                                        </TerminalText>
+                                        <TerminalText prefix="limit">
+                                            {userDomains.length} / {subscription.tier?.domain_limit} domains used
+                                        </TerminalText>
+                                    </div>
+                                    {userDomains.length >= (subscription.tier?.domain_limit || 1) && (
+                                        <div className="flex items-center gap-2 text-neon-purple">
+                                            <Info className="w-5 h-5" />
+                                            <span className="font-mono text-sm">Limit reached - upgrade to register more</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </GlassPanel>
                         )}
 
-                        {/* Generated Keys Display */}
-                        {generatedKeys && !isSuccess && (
-                            <div className="space-y-4 border-t border-border pt-6">
-                                <div className="space-y-2">
-                                    <TerminalText prefix="hash">Domain Hash</TerminalText>
-                                    <code className="block w-full px-4 py-2 bg-secondary/50 border border-border text-neon-cyan text-xs font-mono break-all">
-                                        {generatedKeys.domainHash}
-                                    </code>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <TerminalText prefix="key">Spend Public Key</TerminalText>
-                                    <code className="block w-full px-4 py-2 bg-secondary/50 border border-border text-neon-green text-xs font-mono break-all">
-                                        {formatHash(generatedKeys.spendPubKey)}
-                                    </code>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <TerminalText prefix="key">View Public Key</TerminalText>
-                                    <code className="block w-full px-4 py-2 bg-secondary/50 border border-border text-neon-purple text-xs font-mono break-all">
-                                        {formatHash(generatedKeys.viewPubKey)}
-                                    </code>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
-                                    {/* Save to Wallet (Local Only) */}
-                                    <NeonButton
-                                        variant="purple"
-                                        size="lg"
-                                        className="w-full"
-                                        onClick={() => saveDomainToStorage()}
-                                    >
-                                        <Shield className="w-5 h-5 mr-2" />
-                                        Save to Wallet
-                                    </NeonButton>
-
-                                    {/* Register On-Chain */}
-                                    <NeonButton
-                                        variant="green"
-                                        size="lg"
-                                        className="w-full"
-                                        onClick={async () => {
-                                            console.log('🔴 BUTTON CLICKED!')
-                                            try {
-                                                await handleRegisterDomain()
-                                                console.log('✅ Function completed')
-                                            } catch (err: any) {
-                                                console.error('❌ ERROR:', err)
-                                            }
-                                        }}
-                                        disabled={isPending || isConfirming}
-                                    >
-                                        {isPending || isConfirming ? (
-                                            <>
-                                                <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                                                {isPending ? 'Confirm in Wallet...' : 'Registering...'}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <CheckCircle2 className="w-5 h-5 mr-2" />
-                                                Register On-Chain
-                                            </>
-                                        )}
-                                    </NeonButton>
-                                </div>
-
-                                {/* Info about the difference */}
-                                <div className="mt-4 p-3 bg-secondary/30 border border-border">
-                                    <TerminalText prefix="info">
-                                        "Save to Wallet" stores locally. "Register On-Chain" requires gas fees.
-                                    </TerminalText>
-                                </div>
+                        {/* Registration Form */}
+                        <GlassPanel glow="cyan" className="p-8 space-y-6">
+                            {/* Domain Name Input */}
+                            <div>
+                                <label className="block font-mono text-sm text-muted-foreground mb-2 uppercase tracking-wider">
+                                    Domain Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={domainName}
+                                    onChange={(e) => setDomainName(e.target.value.toLowerCase())}
+                                    placeholder="alice.veil"
+                                    className="w-full px-4 py-3 bg-input border border-border text-foreground font-mono text-sm focus:outline-none focus:border-neon-cyan transition-colors"
+                                    disabled={isGeneratingKeys || isPending || isConfirming}
+                                />
+                                <TerminalText prefix="#">
+                                    Choose a unique identifier for receiving private payments
+                                </TerminalText>
                             </div>
-                        )}
 
-                        {/* Success Message */}
-                        {isSuccess && hash && (
-                            <div className="border-t border-border pt-6">
-                                <div className="flex items-start gap-3 p-4 bg-neon-green/10 border border-neon-green/30">
-                                    <CheckCircle2 className="w-6 h-6 text-neon-green flex-shrink-0 mt-1" />
-                                    <div className="flex-1">
-                                        <h3 className="font-mono text-lg text-neon-green mb-2">
-                                            Domain Registered Successfully!
-                                        </h3>
-                                        <TerminalText prefix="tx">Transaction Hash</TerminalText>
-                                        <code className="block text-xs text-muted-foreground font-mono break-all mt-1">
-                                            {hash}
+                            {/* Generate Keys Button */}
+                            {!generatedKeys && (
+                                <NeonButton
+                                    variant="cyan"
+                                    size="lg"
+                                    className="w-full"
+                                    onClick={handleGenerateKeys}
+                                    disabled={!domainName || isGeneratingKeys}
+                                >
+                                    {isGeneratingKeys ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                                            Generating Keys...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Shield className="w-5 h-5 mr-2" />
+                                            Generate Keys
+                                        </>
+                                    )}
+                                </NeonButton>
+                            )}
+
+                            {/* Generated Keys Display */}
+                            {generatedKeys && !isSuccess && (
+                                <div className="space-y-4 border-t border-border pt-6">
+                                    <div className="space-y-2">
+                                        <TerminalText prefix="hash">Domain Hash</TerminalText>
+                                        <code className="block w-full px-4 py-2 bg-secondary/50 border border-border text-neon-cyan text-xs font-mono break-all">
+                                            {generatedKeys.domainHash}
                                         </code>
-                                        <TerminalText prefix="$" className="mt-4">
-                                            Your domain "{domainName}" is now ready to receive private payments
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <TerminalText prefix="key">Spend Public Key</TerminalText>
+                                        <code className="block w-full px-4 py-2 bg-secondary/50 border border-border text-neon-green text-xs font-mono break-all">
+                                            {formatHash(generatedKeys.spendPubKey)}
+                                        </code>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <TerminalText prefix="key">View Public Key</TerminalText>
+                                        <code className="block w-full px-4 py-2 bg-secondary/50 border border-border text-neon-purple text-xs font-mono break-all">
+                                            {formatHash(generatedKeys.viewPubKey)}
+                                        </code>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+                                        {/* Save to Wallet (Local Only) */}
+                                        <NeonButton
+                                            variant="purple"
+                                            size="lg"
+                                            className="w-full"
+                                            onClick={() => saveDomainToStorage()}
+                                        >
+                                            <Shield className="w-5 h-5 mr-2" />
+                                            Save to Wallet
+                                        </NeonButton>
+
+                                        {/* Register On-Chain */}
+                                        <NeonButton
+                                            variant="green"
+                                            size="lg"
+                                            className="w-full"
+                                            onClick={async () => {
+                                                console.log('🔴 BUTTON CLICKED!')
+                                                try {
+                                                    await handleRegisterDomain()
+                                                    console.log('✅ Function completed')
+                                                } catch (err: any) {
+                                                    console.error('❌ ERROR:', err)
+                                                }
+                                            }}
+                                            disabled={isPending || isConfirming}
+                                        >
+                                            {isPending || isConfirming ? (
+                                                <>
+                                                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                                                    {isPending ? 'Confirm in Wallet...' : 'Registering...'}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle2 className="w-5 h-5 mr-2" />
+                                                    Register On-Chain
+                                                </>
+                                            )}
+                                        </NeonButton>
+                                    </div>
+
+                                    {/* Info about the difference */}
+                                    <div className="mt-4 p-3 bg-secondary/30 border border-border">
+                                        <TerminalText prefix="info">
+                                            "Save to Wallet" stores locally. "Register On-Chain" requires gas fees.
                                         </TerminalText>
                                     </div>
                                 </div>
-                            </div>
-                        )}
-                    </GlassPanel>
+                            )}
 
-                    {/* Info Panel */}
-                    <GlassPanel glow="purple" className="mt-6 p-6">
-                        <h3 className="font-mono text-sm uppercase tracking-wider text-neon-purple mb-4">
-                            How It Works
-                        </h3>
-                        <div className="space-y-3 font-mono text-xs text-muted-foreground">
-                            <TerminalText prefix="1.">
-                                Your domain is hashed and stored on-chain
-                            </TerminalText>
-                            <TerminalText prefix="2.">
-                                Public keys enable stealth address generation
-                            </TerminalText>
-                            <TerminalText prefix="3.">
-                                Payers can send to your domain without revealing your identity
-                            </TerminalText>
-                            <TerminalText prefix="4.">
-                                Only you can detect and claim payments using your private keys
-                            </TerminalText>
-                        </div>
-                    </GlassPanel>
-                </div>
-            </main>
-        </div>
+                            {/* Success Message */}
+                            {isSuccess && hash && (
+                                <div className="border-t border-border pt-6">
+                                    <div className="flex items-start gap-3 p-4 bg-neon-green/10 border border-neon-green/30">
+                                        <CheckCircle2 className="w-6 h-6 text-neon-green flex-shrink-0 mt-1" />
+                                        <div className="flex-1">
+                                            <h3 className="font-mono text-lg text-neon-green mb-2">
+                                                Domain Registered Successfully!
+                                            </h3>
+                                            <TerminalText prefix="tx">Transaction Hash</TerminalText>
+                                            <code className="block text-xs text-muted-foreground font-mono break-all mt-1">
+                                                {hash}
+                                            </code>
+                                            <TerminalText prefix="$" className="mt-4">
+                                                Your domain "{domainName}" is now ready to receive private payments
+                                            </TerminalText>
+                                        </div>
+                                    </div>
+
+                                    {/* Share on Farcaster */}
+                                    {isSDKLoaded && (
+                                        <div className="mt-4">
+                                            <ShareDomainAction domain={domainName} />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </GlassPanel>
+
+                        {/* Info Panel */}
+                        <GlassPanel glow="purple" className="mt-6 p-6">
+                            <h3 className="font-mono text-sm uppercase tracking-wider text-neon-purple mb-4">
+                                How It Works
+                            </h3>
+                            <div className="space-y-3 font-mono text-xs text-muted-foreground">
+                                <TerminalText prefix="1.">
+                                    Your domain is hashed and stored on-chain
+                                </TerminalText>
+                                <TerminalText prefix="2.">
+                                    Public keys enable stealth address generation
+                                </TerminalText>
+                                <TerminalText prefix="3.">
+                                    Payers can send to your domain without revealing your identity
+                                </TerminalText>
+                                <TerminalText prefix="4.">
+                                    Only you can detect and claim payments using your private keys
+                                </TerminalText>
+                            </div>
+                        </GlassPanel>
+                    </div>
+                </main>
+            </div>
+        </SafeAreaContainer>
     )
 }

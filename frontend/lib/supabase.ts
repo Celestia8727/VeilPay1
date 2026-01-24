@@ -53,15 +53,3 @@ export interface Payment {
     transaction_hash: string;
     created_at: string;
 }
-
-export interface Commitment {
-    id: string;
-    commitment_hash: string;
-    merchant_id: string;
-    plan_id: number;
-    expires_at: number;
-    posted_at: number;
-    block_number: number;
-    transaction_hash: string;
-    created_at: string;
-}

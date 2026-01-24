@@ -1,8 +1,6 @@
 export const CONTRACTS = {
     REGISTRY: process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || '',
-    COMMITMENT_REGISTRY: process.env.NEXT_PUBLIC_COMMITMENT_REGISTRY_ADDRESS || '',
     VAULT: process.env.NEXT_PUBLIC_VAULT_ADDRESS || '',
-    VERIFIER: process.env.NEXT_PUBLIC_VERIFIER_ADDRESS || '',
 } as const;
 
 export const REGISTRY_ABI = [
@@ -137,18 +135,4 @@ export const VAULT_ABI = [
             { name: 'ephemeralPubKey', type: 'bytes', indexed: false }
         ]
     }
-] as const;
-
-
-export const COMMITMENT_REGISTRY_ABI = [
-    'function registerCommitment(bytes32 commitment) external',
-    'function registerCommitmentBatch(bytes32[] calldata commitments) external',
-    'function isValidCommitment(bytes32 commitment) external view returns (bool)',
-    'event CommitmentRegistered(bytes32 indexed commitment, address indexed registrar, uint256 timestamp)',
-] as const;
-
-export const VERIFIER_ABI = [
-    'function verifyAccess(bytes calldata proof, bytes32 proofHash, bytes32 merchantId, uint256 planId, uint256 currentEpoch, bytes32 nullifierHash) external returns (bool)',
-    'function isNullifierUsed(bytes32 nullifierHash) external view returns (bool)',
-    'event AccessVerified(bytes32 indexed merchantId, uint256 indexed planId, bytes32 indexed nullifierHash, uint256 timestamp)',
 ] as const;

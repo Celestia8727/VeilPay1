@@ -16,8 +16,11 @@ import { getPaymentsByMerchant, markPaymentClaimed, checkIndexerStatus, type Sto
 import { useX402 } from '@/hooks/use-x402'
 import { PaywallModal } from '@/components/x402/PaywallModal'
 import toast from 'react-hot-toast'
+import { useFarcaster } from '@/components/providers/FarcasterProvider'
+import { SafeAreaContainer } from '@/components/SafeAreaContainer'
 
 export default function ScanPaymentsPage() {
+    const { context, isSDKLoaded } = useFarcaster()
     const { address, isConnected } = useAccount()
     const { data: walletClient } = useWalletClient()
     const publicClient = usePublicClient()

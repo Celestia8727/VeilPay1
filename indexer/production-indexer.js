@@ -1,3 +1,4 @@
+require('dotenv').config()
 const { ethers } = require('ethers')
 const { createClient } = require('@supabase/supabase-js')
 const fs = require('fs')

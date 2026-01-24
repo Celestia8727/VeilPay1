@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils"
-import { Shield, Eye, Lock, Key } from "lucide-react"
+import { Shield, Lock } from "lucide-react"
 
 interface GuaranteeBadgeProps {
-  type: "stealth" | "zk" | "no-identity" | "commitment"
+  type: "stealth" | "no-identity"
   className?: string
 }
 
@@ -12,20 +12,10 @@ const badges = {
     label: "Stealth Payments",
     color: "cyan",
   },
-  zk: {
-    icon: Eye,
-    label: "Zero-Knowledge Proofs",
-    color: "green",
-  },
   "no-identity": {
     icon: Lock,
     label: "No On-Chain Identity",
     color: "purple",
-  },
-  commitment: {
-    icon: Key,
-    label: "Commitment-Based Verification",
-    color: "cyan",
   },
 }
 

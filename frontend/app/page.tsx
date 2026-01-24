@@ -37,9 +37,9 @@ export default function LandingPage() {
 
             {/* Terminal-style description */}
             <div className="max-w-2xl mx-auto mb-12 space-y-2">
-              <TerminalText>Zero-knowledge payment protocol</TerminalText>
+              <TerminalText>Private payment protocol</TerminalText>
               <TerminalText prefix="$">Stealth addresses for complete anonymity</TerminalText>
-              <TerminalText prefix="#">Commitment-based access verification</TerminalText>
+              <TerminalText prefix="#">x402 payment verification</TerminalText>
             </div>
 
             {/* CTA Buttons */}
@@ -61,19 +61,12 @@ export default function LandingPage() {
                   </span>
                 </NeonButton>
               </Link>
-              <Link href="/verify">
-                <NeonButton variant="outline" size="lg" className="w-full sm:w-auto">
-                  Verify Access
-                </NeonButton>
-              </Link>
             </div>
 
             {/* Guarantee badges */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
               <GuaranteeBadge type="stealth" />
-              <GuaranteeBadge type="zk" />
               <GuaranteeBadge type="no-identity" />
-              <GuaranteeBadge type="commitment" />
             </div>
           </div>
         </section>
@@ -90,7 +83,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <GlassPanel glow="cyan" className="group hover:scale-[1.02] transition-transform">
                 <Terminal className="w-8 h-8 text-neon-cyan mb-4" />
                 <h3 className="font-mono text-lg tracking-wider text-foreground mb-2">Stealth Addresses</h3>
@@ -104,25 +97,12 @@ export default function LandingPage() {
 
               <GlassPanel glow="green" className="group hover:scale-[1.02] transition-transform">
                 <Shield className="w-8 h-8 text-neon-green mb-4" />
-                <h3 className="font-mono text-lg tracking-wider text-foreground mb-2">ZK Verification</h3>
+                <h3 className="font-mono text-lg tracking-wider text-foreground mb-2">x402 Payment Protocol</h3>
                 <p className="font-mono text-xs text-muted-foreground leading-relaxed">
-                  Prove access rights without revealing payment details. Cryptographic verification without identity
-                  exposure.
+                  Pay-per-scan protocol for priority payment indexing. Fast, private access to your payment history.
                 </p>
                 <div className="mt-4 pt-4 border-t border-border">
-                  <TerminalText prefix="π">proof_valid: true</TerminalText>
-                </div>
-              </GlassPanel>
-
-              <GlassPanel glow="purple" className="group hover:scale-[1.02] transition-transform">
-                <Zap className="w-8 h-8 text-neon-purple mb-4" />
-                <h3 className="font-mono text-lg tracking-wider text-foreground mb-2">Commitment Registry</h3>
-                <p className="font-mono text-xs text-muted-foreground leading-relaxed">
-                  On-chain commitments without identity correlation. Nullifiers prevent double-spending and replay
-                  attacks.
-                </p>
-                <div className="mt-4 pt-4 border-t border-border">
-                  <TerminalText prefix="C">commitment_registered</TerminalText>
+                  <TerminalText prefix="$">priority_scan: enabled</TerminalText>
                 </div>
               </GlassPanel>
             </div>

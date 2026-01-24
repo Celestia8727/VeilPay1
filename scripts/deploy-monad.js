@@ -54,22 +54,6 @@ async function main() {
     };
 
     // ============================================================================
-    // Deploy CommitmentRegistry
-    // ============================================================================
-    console.log("📦 Deploying CommitmentRegistry...");
-    const CommitmentRegistry = await ethers.getContractFactory("CommitmentRegistry");
-    const commitmentRegistry = await CommitmentRegistry.deploy();
-    await commitmentRegistry.waitForDeployment();
-    const commitmentRegistryAddress = await commitmentRegistry.getAddress();
-    console.log(`✓ CommitmentRegistry deployed to: ${commitmentRegistryAddress}`);
-    console.log(`  Explorer: ${process.env.MONAD_EXPLORER_URL}/address/${commitmentRegistryAddress}\n`);
-
-    deployments.contracts.CommitmentRegistry = {
-        address: commitmentRegistryAddress,
-        deployedAt: new Date().toISOString()
-    };
-
-    // ============================================================================
     // Deploy StealthPaymentVault
     // ============================================================================
     console.log("📦 Deploying StealthPaymentVault...");
@@ -83,23 +67,6 @@ async function main() {
     deployments.contracts.StealthPaymentVault = {
         address: vaultAddress,
         deployedAt: new Date().toISOString()
-    };
-
-    // ============================================================================
-    // Deploy ZKAccessVerifier
-    // ============================================================================
-    console.log("📦 Deploying ZKAccessVerifier...");
-    const ZKAccessVerifier = await ethers.getContractFactory("ZKAccessVerifier");
-    const verifier = await ZKAccessVerifier.deploy(commitmentRegistryAddress);
-    await verifier.waitForDeployment();
-    const verifierAddress = await verifier.getAddress();
-    console.log(`✓ ZKAccessVerifier deployed to: ${verifierAddress}`);
-    console.log(`  Explorer: ${process.env.MONAD_EXPLORER_URL}/address/${verifierAddress}\n`);
-
-    deployments.contracts.ZKAccessVerifier = {
-        address: verifierAddress,
-        deployedAt: new Date().toISOString(),
-        constructorArgs: [commitmentRegistryAddress]
     };
 
     // ============================================================================
@@ -117,14 +84,10 @@ async function main() {
     console.log("=".repeat(80));
     console.log("\n📝 Deployed Contracts:\n");
     console.log(`PrivacyDomainRegistry:  ${registryAddress}`);
-    console.log(`CommitmentRegistry:     ${commitmentRegistryAddress}`);
     console.log(`StealthPaymentVault:    ${vaultAddress}`);
-    console.log(`ZKAccessVerifier:       ${verifierAddress}`);
     console.log("\n🔗 Explorer Links:\n");
     console.log(`${process.env.MONAD_EXPLORER_URL}/address/${registryAddress}`);
-    console.log(`${process.env.MONAD_EXPLORER_URL}/address/${commitmentRegistryAddress}`);
     console.log(`${process.env.MONAD_EXPLORER_URL}/address/${vaultAddress}`);
-    console.log(`${process.env.MONAD_EXPLORER_URL}/address/${verifierAddress}`);
     console.log("\n" + "=".repeat(80));
     console.log("\n💡 Update your .env file with these addresses for the frontend!\n");
     console.log("=".repeat(80));

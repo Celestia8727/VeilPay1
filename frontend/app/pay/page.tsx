@@ -17,6 +17,9 @@ import { generateStealthAddress, isValidPublicKey } from '@/lib/stealth'
 import { getUserDomains, savePayment, type Payment } from '@/lib/storage'
 import { parseEther } from 'ethers'
 import toast from 'react-hot-toast'
+import { useFarcaster } from '@/components/providers/FarcasterProvider'
+import { SafeAreaContainer } from '@/components/SafeAreaContainer'
+import { SharePaymentAction } from '@/components/FarcasterActions'
 
 const plans = [
   { id: "basic", name: "Basic", price: "0.01", period: "/month" },
@@ -25,6 +28,7 @@ const plans = [
 ]
 
 export default function PaymentPage() {
+  const { context, isSDKLoaded } = useFarcaster()
   const { address, isConnected } = useAccount()
   const { data: walletClient } = useWalletClient()
   const [domain, setDomain] = React.useState("")
@@ -260,223 +264,255 @@ export default function PaymentPage() {
   }
 
   return (
-    <div className="min-h-screen" >
-      <AnimatedBackground />
-      <ScanlineOverlay />
-      <NavHeader />
+    <SafeAreaContainer insets={context?.client.safeAreaInsets}>
+      <div className="min-h-screen" >
+        <AnimatedBackground />
+        <ScanlineOverlay />
+        <NavHeader />
 
-      <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="font-mono text-3xl sm:text-4xl tracking-wider text-foreground mb-4">
-              <span className="text-neon-cyan">//</span> Private Payment
-            </h1>
-            <p className="font-mono text-sm text-muted-foreground">
-              Execute anonymous subscription payments via stealth addresses
-            </p>
-          </div>
-
-          {/* Step indicator */}
-          <div className="flex items-center justify-center gap-2 mb-12">
-            {["Input", "Generate", "Preview", "Execute"].map((label, i) => {
-              const stepIndex = ["input", "generating", "preview", "executing", "complete"].indexOf(step)
-              const isActive = i <= Math.min(stepIndex, 3)
-              return (
-                <React.Fragment key={label}>
-                  <div
-                    className={cn(
-                      "font-mono text-xs uppercase tracking-wider px-3 py-1 border",
-                      isActive ? "border-neon-cyan text-neon-cyan" : "border-border text-muted-foreground",
-                    )}
-                  >
-                    {label}
+        <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto">
+            {/* Farcaster User Info */}
+            {isSDKLoaded && context?.user && (
+              <GlassPanel glow="purple" className="p-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={context.user.pfpUrl}
+                    alt={context.user.username}
+                    className="w-12 h-12 rounded-full border-2 border-neon-purple"
+                  />
+                  <div className="flex-1">
+                    <p className="font-mono text-sm text-neon-purple font-bold">
+                      @{context.user.username}
+                    </p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      FID: {context.user.fid}
+                    </p>
                   </div>
-                  {i < 3 && <div className={cn("w-8 h-px", isActive ? "bg-neon-cyan" : "bg-border")} />}
-                </React.Fragment>
-              )
-            })}
-          </div>
-
-          {/* Main content */}
-          <GlassPanel glow="cyan">
-            {step === "complete" ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 mx-auto mb-6 border border-neon-green flex items-center justify-center neon-border-green">
-                  <Check className="w-8 h-8 text-neon-green" />
-                </div>
-                <h2 className="font-mono text-xl tracking-wider text-foreground mb-2">Payment Executed</h2>
-                <p className="font-mono text-sm text-muted-foreground mb-6">Transaction confirmed on-chain</p>
-
-                <div className="space-y-4 max-w-md mx-auto text-left">
-                  <HashDisplay hash={stealthData?.stealthAddress || ""} label="Stealth Address" />
-                  <HashDisplay hash={hash || ""} label="Transaction Hash" />
-                  <div className="flex items-center justify-between pt-4 border-t border-border">
-                    <StatusIndicator status="verified" label="Verified" />
-                    <span className="font-mono text-xs text-muted-foreground">Amount: {getPaymentAmount()} MON</span>
+                  <div className="px-3 py-1 bg-neon-purple/20 border border-neon-purple/50 rounded">
+                    <p className="font-mono text-xs text-neon-purple">Farcaster Mini App</p>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <>
-                {/* Domain Input */}
-                <div className="mb-8">
-                  <label className="block font-mono text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                    Recipient Domain
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={domain}
-                      onChange={(e) => setDomain(e.target.value.toLowerCase())}
-                      placeholder="alice.veil"
-                      className="w-full bg-input border border-border px-4 py-3 font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-neon-cyan focus:shadow-[0_0_10px_rgba(0,212,255,0.3)]"
-                      disabled={step !== "input"}
-                    />
-                  </div>
-                  <TerminalText prefix="#">Enter the domain name of the recipient</TerminalText>
-                </div>
+              </GlassPanel>
+            )}
+            {/* Header */}
+            <div className="text-center mb-12">
+              <h1 className="font-mono text-3xl sm:text-4xl tracking-wider text-foreground mb-4">
+                <span className="text-neon-cyan">//</span> Private Payment
+              </h1>
+              <p className="font-mono text-sm text-muted-foreground">
+                Execute anonymous subscription payments via stealth addresses
+              </p>
+            </div>
 
-                {/* Plan Selector */}
-                <div className="mb-8">
-                  <label className="block font-mono text-xs uppercase tracking-wider text-muted-foreground mb-4">
-                    Select Plan or Enter Custom Amount
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                    {plans.map((plan) => (
-                      <button
-                        key={plan.id}
-                        onClick={() => {
-                          setSelectedPlan(plan.id)
-                          setCustomAmount("")
-                        }}
+            {/* Step indicator */}
+            <div className="flex items-center justify-center gap-2 mb-12">
+              {["Input", "Generate", "Preview", "Execute"].map((label, i) => {
+                const stepIndex = ["input", "generating", "preview", "executing", "complete"].indexOf(step)
+                const isActive = i <= Math.min(stepIndex, 3)
+                return (
+                  <React.Fragment key={label}>
+                    <div
+                      className={cn(
+                        "font-mono text-xs uppercase tracking-wider px-3 py-1 border",
+                        isActive ? "border-neon-cyan text-neon-cyan" : "border-border text-muted-foreground",
+                      )}
+                    >
+                      {label}
+                    </div>
+                    {i < 3 && <div className={cn("w-8 h-px", isActive ? "bg-neon-cyan" : "bg-border")} />}
+                  </React.Fragment>
+                )
+              })}
+            </div>
+
+            {/* Main content */}
+            <GlassPanel glow="cyan">
+              {step === "complete" ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto mb-6 border border-neon-green flex items-center justify-center neon-border-green">
+                    <Check className="w-8 h-8 text-neon-green" />
+                  </div>
+                  <h2 className="font-mono text-xl tracking-wider text-foreground mb-2">Payment Executed</h2>
+                  <p className="font-mono text-sm text-muted-foreground mb-6">Transaction confirmed on-chain</p>
+
+                  <div className="space-y-4 max-w-md mx-auto text-left">
+                    <HashDisplay hash={stealthData?.stealthAddress || ""} label="Stealth Address" />
+                    <HashDisplay hash={hash || ""} label="Transaction Hash" />
+                    <div className="flex items-center justify-between pt-4 border-t border-border">
+                      <StatusIndicator status="verified" label="Verified" />
+                      <span className="font-mono text-xs text-muted-foreground">Amount: {getPaymentAmount()} MON</span>
+                    </div>
+                  </div>
+
+                  {/* Share on Farcaster */}
+                  {isSDKLoaded && (
+                    <div className="mt-6">
+                      <SharePaymentAction domain={domain} amount={getPaymentAmount()} />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Domain Input */}
+                  <div className="mb-8">
+                    <label className="block font-mono text-xs uppercase tracking-wider text-muted-foreground mb-2">
+                      Recipient Domain
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={domain}
+                        onChange={(e) => setDomain(e.target.value.toLowerCase())}
+                        placeholder="alice.veil"
+                        className="w-full bg-input border border-border px-4 py-3 font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-neon-cyan focus:shadow-[0_0_10px_rgba(0,212,255,0.3)]"
                         disabled={step !== "input"}
-                        className={cn(
-                          "p-4 border text-left transition-all",
-                          selectedPlan === plan.id
-                            ? "border-neon-cyan neon-border-cyan bg-neon-cyan/5"
-                            : "border-border hover:border-neon-cyan/50",
-                        )}
-                      >
-                        <div className="font-mono text-sm text-foreground mb-1">{plan.name}</div>
-                        <div className="font-mono text-lg text-neon-cyan">
-                          {plan.price} MON
-                          <span className="text-xs text-muted-foreground">{plan.period}</span>
-                        </div>
-                      </button>
-                    ))}
+                      />
+                    </div>
+                    <TerminalText prefix="#">Enter the domain name of the recipient</TerminalText>
                   </div>
 
-                  {/* Custom Amount */}
-                  <div>
-                    <label className="block font-mono text-xs text-muted-foreground mb-2">Custom Amount (MON)</label>
-                    <input
-                      type="number"
-                      step="0.001"
-                      value={customAmount}
-                      onChange={(e) => {
-                        setCustomAmount(e.target.value)
-                        setSelectedPlan(null)
-                      }}
-                      placeholder="0.01"
-                      className="w-full bg-input border border-border px-4 py-2 font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-neon-purple focus:shadow-[0_0_10px_rgba(168,85,247,0.3)]"
-                      disabled={step !== "input"}
-                    />
-                  </div>
-                </div>
-
-                {/* Stealth Address Generation */}
-                {step === "input" && (
-                  <NeonButton
-                    variant="cyan"
-                    className="w-full"
-                    disabled={!canGenerate}
-                    onClick={generateStealthAddressForRecipient}
-                  >
-                    Generate Stealth Address
-                  </NeonButton>
-                )}
-
-                {step === "generating" && (
-                  <div className="text-center py-8">
-                    <Loader2 className="w-8 h-8 mx-auto mb-4 text-neon-cyan animate-spin" />
-                    <TerminalText typing>Generating stealth address...</TerminalText>
-                  </div>
-                )}
-
-                {(step === "preview" || step === "executing") && stealthData && (
-                  <div className="space-y-6">
-                    {/* Transaction Preview */}
-                    <div className="bg-secondary/30 p-4 border border-border font-mono text-xs space-y-2">
-                      <div className="text-muted-foreground">{"> "} Transaction Preview</div>
-                      <div className="text-foreground">
-                        {"> "} to: <span className="text-neon-cyan">{stealthData.stealthAddress.slice(0, 20)}...</span>
-                      </div>
-                      <div className="text-foreground">
-                        {"> "} value: <span className="text-neon-green">{getPaymentAmount()} MON</span>
-                      </div>
-                      <div className="text-foreground">
-                        {"> "} domain: <span className="text-neon-purple">{domain}</span>
-                      </div>
-                      <div className="text-foreground">
-                        {"> "} ephemeral key: <span className="text-muted-foreground">{stealthData.ephemeralPublicKey.slice(0, 20)}...</span>
-                      </div>
+                  {/* Plan Selector */}
+                  <div className="mb-8">
+                    <label className="block font-mono text-xs uppercase tracking-wider text-muted-foreground mb-4">
+                      Select Plan or Enter Custom Amount
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                      {plans.map((plan) => (
+                        <button
+                          key={plan.id}
+                          onClick={() => {
+                            setSelectedPlan(plan.id)
+                            setCustomAmount("")
+                          }}
+                          disabled={step !== "input"}
+                          className={cn(
+                            "p-4 border text-left transition-all",
+                            selectedPlan === plan.id
+                              ? "border-neon-cyan neon-border-cyan bg-neon-cyan/5"
+                              : "border-border hover:border-neon-cyan/50",
+                          )}
+                        >
+                          <div className="font-mono text-sm text-foreground mb-1">{plan.name}</div>
+                          <div className="font-mono text-lg text-neon-cyan">
+                            {plan.price} MON
+                            <span className="text-xs text-muted-foreground">{plan.period}</span>
+                          </div>
+                        </button>
+                      ))}
                     </div>
 
-                    {step === "preview" ? (
-                      <NeonButton variant="green" className="w-full" onClick={executePayment} disabled={isPending}>
-                        <span className="flex items-center justify-center gap-2">
-                          {isPending ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Confirm in MetaMask...
-                            </>
-                          ) : (
-                            <>
-                              Execute Private Payment
-                              <ArrowRight className="w-4 h-4" />
-                            </>
-                          )}
-                        </span>
-                      </NeonButton>
-                    ) : (
-                      <div className="text-center py-4">
-                        <Loader2 className="w-6 h-6 mx-auto mb-2 text-neon-green animate-spin" />
-                        <TerminalText typing>
-                          {isConfirming ? 'Confirming transaction...' : 'Broadcasting transaction...'}
-                        </TerminalText>
-                      </div>
-                    )}
+                    {/* Custom Amount */}
+                    <div>
+                      <label className="block font-mono text-xs text-muted-foreground mb-2">Custom Amount (MON)</label>
+                      <input
+                        type="number"
+                        step="0.001"
+                        value={customAmount}
+                        onChange={(e) => {
+                          setCustomAmount(e.target.value)
+                          setSelectedPlan(null)
+                        }}
+                        placeholder="0.01"
+                        className="w-full bg-input border border-border px-4 py-2 font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-neon-purple focus:shadow-[0_0_10px_rgba(168,85,247,0.3)]"
+                        disabled={step !== "input"}
+                      />
+                    </div>
                   </div>
-                )}
-              </>
-            )}
-          </GlassPanel>
 
-          {/* Info Panel */}
-          {step === "input" && (
-            <GlassPanel glow="purple" className="mt-6 p-6">
-              <h3 className="font-mono text-sm uppercase tracking-wider text-neon-purple mb-4">
-                How It Works
-              </h3>
-              <div className="space-y-3 font-mono text-xs text-muted-foreground">
-                <TerminalText prefix="1.">
-                  Enter recipient's domain and payment amount
-                </TerminalText>
-                <TerminalText prefix="2.">
-                  System generates a one-time stealth address using ECDH
-                </TerminalText>
-                <TerminalText prefix="3.">
-                  Payment is sent to stealth address (unlinkable to recipient)
-                </TerminalText>
-                <TerminalText prefix="4.">
-                  Only recipient can detect and claim the payment
-                </TerminalText>
-              </div>
+                  {/* Stealth Address Generation */}
+                  {step === "input" && (
+                    <NeonButton
+                      variant="cyan"
+                      className="w-full"
+                      disabled={!canGenerate}
+                      onClick={generateStealthAddressForRecipient}
+                    >
+                      Generate Stealth Address
+                    </NeonButton>
+                  )}
+
+                  {step === "generating" && (
+                    <div className="text-center py-8">
+                      <Loader2 className="w-8 h-8 mx-auto mb-4 text-neon-cyan animate-spin" />
+                      <TerminalText typing>Generating stealth address...</TerminalText>
+                    </div>
+                  )}
+
+                  {(step === "preview" || step === "executing") && stealthData && (
+                    <div className="space-y-6">
+                      {/* Transaction Preview */}
+                      <div className="bg-secondary/30 p-4 border border-border font-mono text-xs space-y-2">
+                        <div className="text-muted-foreground">{"> "} Transaction Preview</div>
+                        <div className="text-foreground">
+                          {"> "} to: <span className="text-neon-cyan">{stealthData.stealthAddress.slice(0, 20)}...</span>
+                        </div>
+                        <div className="text-foreground">
+                          {"> "} value: <span className="text-neon-green">{getPaymentAmount()} MON</span>
+                        </div>
+                        <div className="text-foreground">
+                          {"> "} domain: <span className="text-neon-purple">{domain}</span>
+                        </div>
+                        <div className="text-foreground">
+                          {"> "} ephemeral key: <span className="text-muted-foreground">{stealthData.ephemeralPublicKey.slice(0, 20)}...</span>
+                        </div>
+                      </div>
+
+                      {step === "preview" ? (
+                        <NeonButton variant="green" className="w-full" onClick={executePayment} disabled={isPending}>
+                          <span className="flex items-center justify-center gap-2">
+                            {isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Confirm in MetaMask...
+                              </>
+                            ) : (
+                              <>
+                                Execute Private Payment
+                                <ArrowRight className="w-4 h-4" />
+                              </>
+                            )}
+                          </span>
+                        </NeonButton>
+                      ) : (
+                        <div className="text-center py-4">
+                          <Loader2 className="w-6 h-6 mx-auto mb-2 text-neon-green animate-spin" />
+                          <TerminalText typing>
+                            {isConfirming ? 'Confirming transaction...' : 'Broadcasting transaction...'}
+                          </TerminalText>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </GlassPanel>
-          )}
-        </div>
-      </main>
-    </div >
+
+            {/* Info Panel */}
+            {step === "input" && (
+              <GlassPanel glow="purple" className="mt-6 p-6">
+                <h3 className="font-mono text-sm uppercase tracking-wider text-neon-purple mb-4">
+                  How It Works
+                </h3>
+                <div className="space-y-3 font-mono text-xs text-muted-foreground">
+                  <TerminalText prefix="1.">
+                    Enter recipient's domain and payment amount
+                  </TerminalText>
+                  <TerminalText prefix="2.">
+                    System generates a one-time stealth address using ECDH
+                  </TerminalText>
+                  <TerminalText prefix="3.">
+                    Payment is sent to stealth address (unlinkable to recipient)
+                  </TerminalText>
+                  <TerminalText prefix="4.">
+                    Only recipient can detect and claim the payment
+                  </TerminalText>
+                </div>
+              </GlassPanel>
+            )}
+          </div>
+        </main>
+      </div>
+    </SafeAreaContainer>
   )
 }

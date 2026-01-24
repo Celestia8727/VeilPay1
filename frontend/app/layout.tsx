@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { Web3Provider } from "@/components/providers/Web3Provider"
+import { FarcasterProvider } from "@/components/providers/FarcasterProvider"
 import ToastProvider from "@/components/providers/ToastProvider"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
@@ -12,7 +13,7 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" })
 export const metadata: Metadata = {
   title: "Veil Protocol | Private Subscriptions. Trustless Access.",
   description:
-    "A zero-knowledge payment protocol for private subscriptions and trustless access verification using stealth addresses.",
+    "A private payment protocol for subscriptions using stealth addresses and x402 payment verification.",
   generator: "v0.app",
   icons: {
     icon: [
@@ -45,13 +46,16 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
-        <Web3Provider>
-          {children}
-          <ToastProvider />
-        </Web3Provider>
+        <FarcasterProvider>
+          <Web3Provider>
+            {children}
+            <ToastProvider />
+          </Web3Provider>
+        </FarcasterProvider>
         <Analytics />
       </body>
     </html>
   )
 }
+
 
