@@ -67,20 +67,30 @@ function WalletButton() {
       // Reset any previous connection errors
       reset()
 
-      // Try to find the best connector
-      const farcasterConnector = connectors.find(c => c.name.toLowerCase().includes('farcaster'))
+      // In Farcaster mini app, always use Farcaster connector
+      const farcasterConnector = connectors.find(c =>
+        c.name.toLowerCase().includes('farcaster') ||
+        c.type === 'farcaster'
+      )
+
+      // Fallback to injected for desktop browser testing
       const injectedConnector = connectors.find(c => c.type === 'injected')
 
-      // Prefer Farcaster in mini app environment, fallback to injected
+      // Prioritize Farcaster connector
       const connector = farcasterConnector || injectedConnector || connectors[0]
 
       console.log('Using connector:', connector?.name, connector?.type)
+      console.log('All available connectors:', connectors.map(c => ({ name: c.name, type: c.type })))
 
       if (connector) {
         await connect({ connector })
       } else {
         console.error('No connectors available')
-        alert('No wallet connectors found. Please install MetaMask or use a compatible wallet.')
+        const isFarcasterEnv = typeof window !== 'undefined' && window.location.ancestorOrigins?.length > 0
+        const message = isFarcasterEnv
+          ? 'Unable to connect to Farcaster wallet. Please try again.'
+          : 'No wallet found. Please install MetaMask or open in Farcaster.'
+        alert(message)
         setIsConnecting(false)
       }
     } catch (error) {
@@ -97,6 +107,11 @@ function WalletButton() {
   }
 
   if (!isConnected) {
+    // Check if we're in Farcaster environment
+    const hasFarcasterConnector = connectors.some(c =>
+      c.name.toLowerCase().includes('farcaster') || c.type === 'farcaster'
+    )
+
     return (
       <button
         onClick={handleConnect}
@@ -104,7 +119,7 @@ function WalletButton() {
         type="button"
         className="px-4 py-1.5 bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan font-mono text-xs uppercase tracking-wider hover:bg-neon-cyan/20 transition-all rounded-md disabled:opacity-50"
       >
-        {isConnecting || isPending ? 'Connecting...' : 'Connect'}
+        {isConnecting || isPending ? 'Connecting...' : hasFarcasterConnector ? 'Connect Wallet' : 'Connect'}
       </button>
     )
   }
