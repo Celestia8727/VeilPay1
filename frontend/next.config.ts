@@ -7,9 +7,13 @@ const nextConfig: NextConfig = {
     // Ignore test files in node_modules
     config.resolve.alias = {
       ...config.resolve.alias,
-      // Prevent importing test files
+      // Prevent importing test and bench files
       'thread-stream/test': false,
+      'thread-stream/bench': false,
+      'thread-stream/bench.js': false,
       'pino/test': false,
+      'pino/bench': false,
+      'pino/bench.js': false,
     };
 
     // Add fallbacks for Node.js modules
