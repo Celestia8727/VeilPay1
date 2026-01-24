@@ -67,29 +67,49 @@ function WalletButton() {
       // Reset any previous connection errors
       reset()
 
-      // In Farcaster mini app, always use Farcaster connector
+      // Detect if we're in Farcaster environment
+      const isFarcasterEnv = typeof window !== 'undefined' && (
+        window.location.ancestorOrigins?.length > 0 ||
+        window.parent !== window ||
+        document.referrer.includes('warpcast') ||
+        document.referrer.includes('farcaster')
+      )
+
+      console.log('Environment:', isFarcasterEnv ? 'Farcaster Mini App' : 'Regular Web')
+
+      // Find available connectors
       const farcasterConnector = connectors.find(c =>
         c.name.toLowerCase().includes('farcaster') ||
         c.type === 'farcaster'
       )
-
-      // Fallback to injected for desktop browser testing
       const injectedConnector = connectors.find(c => c.type === 'injected')
 
-      // Prioritize Farcaster connector
-      const connector = farcasterConnector || injectedConnector || connectors[0]
+      // Choose connector based on environment
+      let connector
+      if (isFarcasterEnv && farcasterConnector) {
+        // In Farcaster app, use Farcaster connector
+        connector = farcasterConnector
+        console.log('Using Farcaster connector in mini app')
+      } else if (injectedConnector) {
+        // On regular web, use injected wallet (MetaMask, etc.)
+        connector = injectedConnector
+        console.log('Using injected connector on web')
+      } else {
+        // Fallback to first available
+        connector = connectors[0]
+        console.log('Using fallback connector:', connector?.name)
+      }
 
-      console.log('Using connector:', connector?.name, connector?.type)
+      console.log('Selected connector:', connector?.name, connector?.type)
       console.log('All available connectors:', connectors.map(c => ({ name: c.name, type: c.type })))
 
       if (connector) {
         await connect({ connector })
       } else {
         console.error('No connectors available')
-        const isFarcasterEnv = typeof window !== 'undefined' && window.location.ancestorOrigins?.length > 0
         const message = isFarcasterEnv
           ? 'Unable to connect to Farcaster wallet. Please try again.'
-          : 'No wallet found. Please install MetaMask or open in Farcaster.'
+          : 'No wallet found. Please install MetaMask or a compatible wallet.'
         alert(message)
         setIsConnecting(false)
       }
