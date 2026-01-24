@@ -1,24 +1,38 @@
 import { NextResponse } from 'next/server'
 
-export async function GET() {
-    // Fetch the hosted manifest from Farcaster
-    const hostedManifestUrl = 'https://api.farcaster.xyz/miniapps/hosted-manifest/019bf0da-8bd4-fc46-2303-a238fadf5f68'
+const appUrl = 'https://veil-pay1.vercel.app'
 
-    try {
-        const response = await fetch(hostedManifestUrl)
-        const manifest = await response.json()
-
-        return NextResponse.json(manifest, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'public, max-age=3600',
-            },
-        })
-    } catch (error) {
-        console.error('Failed to fetch Farcaster manifest:', error)
-        return NextResponse.json(
-            { error: 'Failed to fetch manifest' },
-            { status: 500 }
-        )
+const farcasterConfig = {
+    accountAssociation: {
+        header: "eyJmaWQiOjI0NDQ4MDEsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg2ZWQyMEY3YWVDRTVmRmI0OTIxMmFiQTBGNDY5MmNlRUY4ODY0QTBGIn0",
+        payload: "eyJkb21haW4iOiJ2ZWlsLXBheTEudmVyY2VsLmFwcCJ9",
+        signature: "2APy6ZGpBws5SVUsr9J70xU/F11cskkl9v6k7+voHr0YbFaJdtmOOmXbfSOeywROwYC5ODYNFNSEoIijHHgQExw="
+    },
+    frame: {
+        version: "1",
+        name: "Veil",
+        iconUrl: `${appUrl}/icon.png`,
+        homeUrl: appUrl,
+        imageUrl: `${appUrl}/image.png`,
+        buttonTitle: "Veil",
+        splashImageUrl: `${appUrl}/splash.png`,
+        splashBackgroundColor: "#6200EA",
+        webhookUrl: `${appUrl}/api/webhook`,
+        subtitle: "Private Payments. Maximum privacy.",
+        description: "A self custodial pruivacy domain layer bilt on Monad using stealth addresses to ensure maximum privacy in a transaction.",
+        primaryCategory: "finance",
+        tags: ["consumer", "defi", "hackathon", "privacy", "stealthaddress"],
+        tagline: "Grow",
+        ogDescription: "Absolutely hidden payments using stealth addresses",
+        castShareUrl: appUrl
     }
+}
+
+export async function GET() {
+    return NextResponse.json(farcasterConfig, {
+        headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=3600',
+        },
+    })
 }
