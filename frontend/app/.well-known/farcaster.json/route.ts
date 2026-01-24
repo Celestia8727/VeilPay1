@@ -1,31 +1,29 @@
 import { NextResponse } from 'next/server'
 
-const appUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'
+const appUrl = process.env.NEXT_PUBLIC_URL || 'https://veil-pay1.vercel.app'
 
 const farcasterConfig = {
     accountAssociation: {
-        // TODO: Generate this using Farcaster's signing tool before production deployment
-        // Visit https://warpcast.com/~/developers/mini-apps to generate
-        "header": "",
-        "payload": "",
-        "signature": ""
+        header: "eyJmaWQiOjI0NDQ4MDEsInR5cGUiOiJhdXRoIiwia2V5IjoiMHhlNDE5MTdhMjlDMmE2ZTMzNmUzNjcxQzJDMjkyNjYyMTM5MTYyRjM0In0",
+        payload: "eyJkb21haW4iOiJ2ZWlsLXBheTEudmVyY2VsLmFwcCJ9",
+        signature: "YOUR_SIGNATURE_HERE" // You need to get this from Warpcast developer portal
     },
     frame: {
         version: "1",
-        name: "PrivateVeil - Privacy Domains",
+        name: "VeilProject",
         iconUrl: `${appUrl}/icon.png`,
-        homeUrl: `${appUrl}`,
-        imageUrl: `${appUrl}/og-image.png`,
-        screenshotUrls: [
-            `${appUrl}/screenshots/register.png`,
-            `${appUrl}/screenshots/pay.png`,
-            `${appUrl}/screenshots/scan.png`
-        ],
-        tags: ["monad", "privacy", "domains", "payments", "web3", "stealth"],
-        primaryCategory: "utilities",
-        buttonTitle: "Open PrivateVeil",
+        homeUrl: appUrl,
+        imageUrl: `${appUrl}/image.png`,
+        buttonTitle: "Veil",
         splashImageUrl: `${appUrl}/splash.png`,
-        splashBackgroundColor: "#0a0a0f",
+        splashBackgroundColor: "#00F5FF", // Removed trailing space
+        webhookUrl: `${appUrl}/api/webhook`,
+        subtitle: "A self custodial privacy domain layer on Monad",
+        description: "Self custodial privacy domain layer on monad",
+        primaryCategory: "finance",
+        tags: ["finance", "defi", "consumer"],
+        ogTitle: "VeilPay",
+        ogDescription: "Maximum privacy is what we want, achieve it now"
     }
 }
 
