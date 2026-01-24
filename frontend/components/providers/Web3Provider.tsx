@@ -4,7 +4,8 @@ import { WagmiProvider, createConfig, http } from 'wagmi';
 import { mainnet, sepolia } from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RainbowKitProvider, getDefaultConfig, darkTheme } from '@rainbow-me/rainbowkit';
-import { injected, walletConnect } from 'wagmi/connectors';
+import { injected } from 'wagmi/connectors';
+import { farcasterConnector } from '@farcaster/miniapp-wagmi-connector';
 import '@rainbow-me/rainbowkit/styles.css';
 
 // Define Monad Testnet
@@ -26,14 +27,12 @@ export const monadTestnet = {
     testnet: true,
 } as const;
 
-// Create wagmi config with explicit connectors for wagmi v3
+// Create wagmi config with Farcaster connector for mini app
 const config = createConfig({
     chains: [monadTestnet, sepolia],
     connectors: [
-        injected(),
-        walletConnect({
-            projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID',
-        }),
+        farcasterConnector(), // Farcaster wallet for mini app
+        injected(), // Browser wallets (MetaMask, etc.) for web
     ],
     transports: {
         [monadTestnet.id]: http('https://testnet-rpc.monad.xyz'),
