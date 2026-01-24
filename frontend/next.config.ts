@@ -3,18 +3,14 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   turbopack: {},
 
-  webpack: (config, { isServer }) => {
-    // Ignore test files in node_modules
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      // Prevent importing test and bench files
-      'thread-stream/test': false,
-      'thread-stream/bench': false,
-      'thread-stream/bench.js': false,
-      'pino/test': false,
-      'pino/bench': false,
-      'pino/bench.js': false,
-    };
+  webpack: (config, { isServer, webpack }) => {
+    // Completely ignore problematic packages
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^(bench|test)\.js$/,
+        contextRegExp: /thread-stream|pino/,
+      })
+    );
 
     // Add fallbacks for Node.js modules
     if (!isServer) {
@@ -24,6 +20,7 @@ const nextConfig: NextConfig = {
         net: false,
         tls: false,
         crypto: false,
+        'pino-pretty': false,
       };
     }
 
