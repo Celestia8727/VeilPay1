@@ -5,7 +5,6 @@
         {
             "source": "/.well-known/farcaster.json",
             "destination": "https://api.farcaster.xyz/miniapps/hosted-manifest/019bf0da-8bd4-fc46-2303-a238fadf5f68",
-            "permanent": false,
             "statusCode": 307
         }
     ]
