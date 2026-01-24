@@ -1,12 +1,9 @@
 'use client';
 
 import { WagmiProvider, createConfig, http } from 'wagmi';
-import { mainnet, sepolia } from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { RainbowKitProvider, getDefaultConfig, darkTheme } from '@rainbow-me/rainbowkit';
 import { injected } from 'wagmi/connectors';
-import { farcasterConnector } from '@farcaster/miniapp-wagmi-connector';
-import '@rainbow-me/rainbowkit/styles.css';
+import farcasterConnector from '@farcaster/miniapp-wagmi-connector';
 
 // Define Monad Testnet
 export const monadTestnet = {
@@ -27,16 +24,15 @@ export const monadTestnet = {
     testnet: true,
 } as const;
 
-// Create wagmi config with Farcaster connector for mini app
+// Create wagmi config WITHOUT RainbowKit to avoid WalletConnect issues
 const config = createConfig({
-    chains: [monadTestnet, sepolia],
+    chains: [monadTestnet],
     connectors: [
         farcasterConnector(), // Farcaster wallet for mini app
         injected(), // Browser wallets (MetaMask, etc.) for web
     ],
     transports: {
         [monadTestnet.id]: http('https://testnet-rpc.monad.xyz'),
-        [sepolia.id]: http(),
     },
     ssr: true,
 });
@@ -47,15 +43,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     return (
         <WagmiProvider config={config}>
             <QueryClientProvider client={queryClient}>
-                <RainbowKitProvider
-                    theme={darkTheme({
-                        accentColor: '#00F5FF',
-                        accentColorForeground: '#0A0A0F',
-                        borderRadius: 'medium',
-                    })}
-                >
-                    {children}
-                </RainbowKitProvider>
+                {children}
             </QueryClientProvider>
         </WagmiProvider>
     );
