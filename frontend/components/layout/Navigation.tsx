@@ -1,10 +1,37 @@
 'use client';
 
 import Link from 'next/link';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { Shield, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// Simple Wallet Button
+function WalletButton() {
+    const { address, isConnected } = useAccount();
+    const { connect, connectors } = useConnect();
+    const { disconnect } = useDisconnect();
+
+    if (!isConnected) {
+        return (
+            <button
+                onClick={() => connect({ connector: connectors[0] })}
+                className="px-4 py-2 bg-cyan-500/20 border border-cyan-400/50 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-all font-medium"
+            >
+                Connect Wallet
+            </button>
+        );
+    }
+
+    return (
+        <button
+            onClick={() => disconnect()}
+            className="px-4 py-2 bg-cyan-500/20 border border-cyan-400/50 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-all font-medium"
+        >
+            {address?.slice(0, 6)}...{address?.slice(-4)}
+        </button>
+    );
+}
 
 export default function Navigation() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -43,7 +70,7 @@ export default function Navigation() {
 
                     {/* Wallet Connect Button */}
                     <div className="hidden md:block">
-                        <ConnectButton />
+                        <WalletButton />
                     </div>
 
                     {/* Mobile Menu Button */}
