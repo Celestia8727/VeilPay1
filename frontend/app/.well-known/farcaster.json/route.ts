@@ -18,7 +18,7 @@ const farcasterConfig = {
         splashImageUrl: `${appUrl}/splash.png`,
         splashBackgroundColor: "#6200EA",
         webhookUrl: `${appUrl}/api/webhook`,
-        subtitle: "Private Payments. Maximum privacy.",
+        subtitle: "Private Payments on Monad",
         description: "A self custodial pruivacy domain layer bilt on Monad using stealth addresses to ensure maximum privacy in a transaction.",
         primaryCategory: "finance",
         tags: ["consumer", "defi", "hackathon", "privacy", "stealthaddress"],
