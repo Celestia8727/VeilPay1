@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Menu, X, ChevronDown, Layers, CreditCard, LayoutDashboard } from "lucide-react"
-import { ConnectButton } from "@rainbow-me/rainbowkit"
+import { useAccount, useConnect, useDisconnect } from "wagmi"
 
 // Grouped navigation structure
 const navGroups = {
@@ -31,6 +31,60 @@ const navGroups = {
 const mainLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
 ]
+
+// Custom Wallet Button using Wagmi
+function WalletButton() {
+  const { address, isConnected, chain } = useAccount()
+  const { connect, connectors } = useConnect()
+  const { disconnect } = useDisconnect()
+  const [showMenu, setShowMenu] = React.useState(false)
+
+  if (!isConnected) {
+    return (
+      <button
+        onClick={() => connect({ connector: connectors[0] })}
+        type="button"
+        className="px-4 py-1.5 bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan font-mono text-xs uppercase tracking-wider hover:bg-neon-cyan/20 transition-all rounded-md"
+      >
+        Connect
+      </button>
+    )
+  }
+
+  const wrongNetwork = chain?.id !== 10143 // Monad testnet
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShowMenu(!showMenu)}
+        type="button"
+        className={cn(
+          "px-3 py-1.5 border font-mono text-xs uppercase tracking-wider transition-all rounded-md",
+          wrongNetwork
+            ? "bg-red-500/10 border-red-500/40 text-red-400 hover:bg-red-500/20"
+            : "bg-neon-cyan/10 border-neon-cyan/40 text-neon-cyan hover:bg-neon-cyan/20"
+        )}
+      >
+        {wrongNetwork ? "Wrong Network" : `${address?.slice(0, 6)}...${address?.slice(-4)}`}
+      </button>
+
+      {showMenu && (
+        <div className="absolute right-0 top-full mt-2 w-48 bg-background/95 backdrop-blur-xl border border-neon-cyan/20 rounded-xl p-2 shadow-2xl">
+          <button
+            onClick={() => {
+              disconnect()
+              setShowMenu(false)
+            }}
+            className="w-full px-3 py-2 text-left font-mono text-xs text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-md transition-colors"
+          >
+            Disconnect
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 function NavDropdown({
   label,
@@ -178,85 +232,7 @@ export function NavHeader() {
             <div className="w-px h-6 bg-border/50 mx-2" />
 
             {/* Wallet Connect Button */}
-            <ConnectButton.Custom>
-              {({
-                account,
-                chain,
-                openAccountModal,
-                openChainModal,
-                openConnectModal,
-                mounted,
-              }) => {
-                const ready = mounted
-                const connected = ready && account && chain
-
-                return (
-                  <div
-                    {...(!ready && {
-                      'aria-hidden': true,
-                      'style': {
-                        opacity: 0,
-                        pointerEvents: 'none',
-                        userSelect: 'none',
-                      },
-                    })}
-                  >
-                    {(() => {
-                      if (!connected) {
-                        return (
-                          <button
-                            onClick={openConnectModal}
-                            type="button"
-                            className="px-4 py-1.5 bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan font-mono text-xs uppercase tracking-wider hover:bg-neon-cyan/20 transition-all rounded-md"
-                          >
-                            Connect
-                          </button>
-                        )
-                      }
-
-                      if (chain.unsupported) {
-                        return (
-                          <button
-                            onClick={openChainModal}
-                            type="button"
-                            className="px-4 py-1.5 bg-red-500/10 border border-red-500/40 text-red-400 font-mono text-xs uppercase tracking-wider hover:bg-red-500/20 transition-all rounded-md"
-                          >
-                            Wrong Network
-                          </button>
-                        )
-                      }
-
-                      return (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={openChainModal}
-                            type="button"
-                            className="px-2 py-1.5 bg-white/5 border border-border/50 font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors rounded-md flex items-center gap-1"
-                          >
-                            {chain.hasIcon && chain.iconUrl && (
-                              <img
-                                alt={chain.name ?? 'Chain icon'}
-                                src={chain.iconUrl}
-                                className="w-3 h-3"
-                              />
-                            )}
-                            {chain.name?.slice(0, 6)}
-                          </button>
-
-                          <button
-                            onClick={openAccountModal}
-                            type="button"
-                            className="px-3 py-1.5 bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan font-mono text-xs uppercase tracking-wider hover:bg-neon-cyan/20 transition-all rounded-md"
-                          >
-                            {account.displayName}
-                          </button>
-                        </div>
-                      )
-                    })()}
-                  </div>
-                )
-              }}
-            </ConnectButton.Custom>
+            <WalletButton />
           </nav>
 
           {/* Mobile menu button */}
@@ -332,7 +308,7 @@ export function NavHeader() {
 
           {/* Mobile Wallet Connect */}
           <div className="pt-4 mt-4 border-t border-border/30">
-            <ConnectButton />
+            <WalletButton />
           </div>
         </nav>
       )}
