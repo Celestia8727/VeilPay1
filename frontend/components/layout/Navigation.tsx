@@ -108,7 +108,7 @@ export default function Navigation() {
                                 </Link>
                             ))}
                             <div className="pt-4 border-t border-cyan-400/20">
-                                <ConnectButton />
+                                <WalletButton />
                             </div>
                         </div>
                     </motion.div>
