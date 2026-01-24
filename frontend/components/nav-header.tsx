@@ -35,9 +35,10 @@ const mainLinks = [
 // Custom Wallet Button using Wagmi
 function WalletButton() {
   const { address, isConnected, chain } = useAccount()
-  const { connect, connectors, isPending, error } = useConnect()
+  const { connect, connectors, isPending, error, reset } = useConnect()
   const { disconnect } = useDisconnect()
   const [showMenu, setShowMenu] = React.useState(false)
+  const [isConnecting, setIsConnecting] = React.useState(false)
 
   // Debug: Log connectors
   React.useEffect(() => {
@@ -51,16 +52,27 @@ function WalletButton() {
     }
   }, [error])
 
+  // Reset connecting state when connection status changes
+  React.useEffect(() => {
+    if (isConnected) {
+      setIsConnecting(false)
+    }
+  }, [isConnected])
+
   const handleConnect = async () => {
     try {
+      setIsConnecting(true)
       console.log('Attempting to connect...')
 
-      // Try to find the best connector
-      const injectedConnector = connectors.find(c => c.type === 'injected')
-      const farcasterConnector = connectors.find(c => c.name.toLowerCase().includes('farcaster'))
+      // Reset any previous connection errors
+      reset()
 
-      // Prefer injected (MetaMask) for browser, Farcaster for mini app
-      const connector = injectedConnector || farcasterConnector || connectors[0]
+      // Try to find the best connector
+      const farcasterConnector = connectors.find(c => c.name.toLowerCase().includes('farcaster'))
+      const injectedConnector = connectors.find(c => c.type === 'injected')
+
+      // Prefer Farcaster in mini app environment, fallback to injected
+      const connector = farcasterConnector || injectedConnector || connectors[0]
 
       console.log('Using connector:', connector?.name, connector?.type)
 
@@ -69,21 +81,30 @@ function WalletButton() {
       } else {
         console.error('No connectors available')
         alert('No wallet connectors found. Please install MetaMask or use a compatible wallet.')
+        setIsConnecting(false)
       }
     } catch (error) {
       console.error('Failed to connect:', error)
+      setIsConnecting(false)
     }
+  }
+
+  const handleDisconnect = () => {
+    setShowMenu(false)
+    setIsConnecting(false)
+    reset()
+    disconnect()
   }
 
   if (!isConnected) {
     return (
       <button
         onClick={handleConnect}
-        disabled={isPending}
+        disabled={isConnecting || isPending}
         type="button"
         className="px-4 py-1.5 bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan font-mono text-xs uppercase tracking-wider hover:bg-neon-cyan/20 transition-all rounded-md disabled:opacity-50"
       >
-        {isPending ? 'Connecting...' : 'Connect'}
+        {isConnecting || isPending ? 'Connecting...' : 'Connect'}
       </button>
     )
   }
@@ -108,10 +129,7 @@ function WalletButton() {
       {showMenu && (
         <div className="absolute right-0 top-full mt-2 w-48 bg-background/95 backdrop-blur-xl border border-neon-cyan/20 rounded-xl p-2 shadow-2xl z-50">
           <button
-            onClick={() => {
-              disconnect()
-              setShowMenu(false)
-            }}
+            onClick={handleDisconnect}
             className="w-full px-3 py-2 text-left font-mono text-xs text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-md transition-colors"
           >
             Disconnect
