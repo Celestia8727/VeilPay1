@@ -1,10 +1,10 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import sdk, { type Context } from '@farcaster/miniapp-sdk'
+import sdk from '@farcaster/miniapp-sdk'
 
 interface FarcasterContextType {
-    context: Context | null
+    context: any | null
     isSDKLoaded: boolean
     isLoading: boolean
     actions: typeof sdk.actions
@@ -13,7 +13,7 @@ interface FarcasterContextType {
 const FarcasterContext = createContext<FarcasterContextType | undefined>(undefined)
 
 export function FarcasterProvider({ children }: { children: ReactNode }) {
-    const [context, setContext] = useState<Context | null>(null)
+    const [context, setContext] = useState<any | null>(null)
     const [isSDKLoaded, setIsSDKLoaded] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
 
