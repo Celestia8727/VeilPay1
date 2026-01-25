@@ -1,352 +1,236 @@
-# veil402 - Privacy-Preserving Subscriptions
+# VeilPay - Privacy-First Payment Platform on Monad
 
-> Cross-chain subscription platform with PLONK zero-knowledge proofs on Monad + Sepolia
+A self-custodial privacy domain layer built on Monad using stealth addresses to ensure maximum privacy in transactions. VeilPay enables completely private payments while maintaining full user control over funds.
 
-## 🎯 What is veil402?
+🔗 **Live Demo:** [veil-pay1.vercel.app](https://veil-pay1.vercel.app)  
+🎯 **Farcaster Mini App:** Available on Warpcast
 
-A **privacy-first subscription platform** where users can:
-- Pay subscriptions privately via stealth addresses
-- Prove access using zero-knowledge proofs
-- Keep their identity and payment history completely private
+## 🌟 Features
 
-**No one knows who paid, when they paid, or what they're accessing.**
+### Core Privacy Features
+- **Stealth Addresses**: Generate unique one-time addresses for each payment
+- **Privacy Domains**: Register human-readable privacy domains (e.g., `alice.veil`)
+- **Zero-Knowledge Proofs**: Verify payments without revealing transaction details
+- **Self-Custodial**: Users maintain full control of their private keys
 
----
+### Payment Features
+- **Private Payments**: Send/receive payments with complete anonymity
+- **Subscription Plans**: Create and manage recurring payment plans
+- **Payment Scanning**: Detect incoming payments to your privacy domain
+- **Claim Payments**: Withdraw funds from stealth addresses to your wallet
+
+### x402 Protocol Integration
+- **Priority Scan**: Instant payment detection (paid service)
+- **Gas Relay**: Gasless claiming of payments (paid service)
+- **USDC Payments**: Pay for premium services with USDC
+- **Payment Authorization**: EIP-3009 `transferWithAuthorization` support
+
+### Farcaster Integration
+- **Mini App**: Full Farcaster mini app support
+- **Wallet Integration**: Seamless Farcaster wallet connection
+- **Social Features**: Share privacy domains on Farcaster
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    MONAD TESTNET                             │
-│  ┌──────────────────────┐  ┌─────────────────────────────┐ │
-│  │ PrivacyDomainRegistry│  │ StealthSubscriptionVault    │ │
-│  │ - Domain → Keys      │  │ - Subscription Storage      │ │
-│  └──────────────────────┘  │ - getSubscription()         │ │
-│                             └─────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-                   Fetch Subscription Data
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    OFF-CHAIN (JavaScript)                    │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │ PLONK Proof Generator (Noir + Barretenberg)          │  │
-│  │ - Generates zero-knowledge proof                     │  │
-│  │ - Computes proof hash                                │  │
-│  └──────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-                    Submit Proof + Hash
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    SEPOLIA TESTNET                           │
-│  ┌──────────────────────┐  ┌─────────────────────────────┐ │
-│  │ ZKAccessVerifier     │  │ PLONK Verifier              │ │
-│  │ - Verifies proofs    │  │ - UltraPlonk verification   │ │
-│  │ - Tracks nullifiers  │  │                             │ │
-│  └──────────────────────┘  └─────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
+### Smart Contracts (Solidity)
+- **PrivacyDomainRegistry**: Register and manage privacy domains
+- **StealthPaymentVault**: Handle stealth address payments
+- **CommitmentRegistry**: Store payment commitments for privacy
 
----
+### Frontend (Next.js 14)
+- **App Router**: Modern Next.js app directory structure
+- **Wagmi v2**: Ethereum wallet integration
+- **Farcaster SDK**: Mini app functionality
+- **TailwindCSS**: Responsive, modern UI
 
-## ✨ Key Features
-
-### Privacy-First
-- ✅ **Stealth addresses** - No reusable payment addresses
-- ✅ **Zero-knowledge proofs** - Prove access without revealing identity
-- ✅ **No wallet tracking** - Access checks are cryptographic, not address-based
-- ✅ **Private subscriptions** - No one can see your subscription history
-
-### Cross-Chain
-- ✅ **Monad** - Subscription logic (optimized for parallel execution)
-- ✅ **Sepolia** - ZK proof verification (PLONK UltraPlonk)
-- ✅ **Off-chain proving** - Fast proof generation in JavaScript
-
-### Developer-Friendly
-- ✅ **TypeScript SDK** - Easy integration
-- ✅ **Comprehensive docs** - Step-by-step guides
-- ✅ **Example code** - Ready-to-use templates
-
----
+### Backend Services
+- **Supabase**: Database for indexing blockchain events
+- **Production Indexer**: Real-time blockchain event indexing
+- **x402 API**: Premium service endpoints
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+- Node.js 18+
+- MetaMask or compatible wallet
+- Monad testnet RPC access
+
+### Installation
 
 ```bash
-# Install Noir
-curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash
-noirup
+# Clone the repository
+git clone https://github.com/Vaibhav-Rawat-cipher/VeilPay.git
+cd VeilPay
 
 # Install dependencies
 npm install
-cd lib && npm install && cd ..
-```
+cd frontend && npm install && cd ..
 
-### Setup
-
-```bash
-# 1. Configure environment
+# Setup environment variables
 cp .env.example .env
-# Edit .env with your keys
-
-# 2. Compile Noir circuit
-npm run compile:noir
-
-# 3. Build proof generator
-npm run build:lib
-
-# 4. Deploy to Monad
-npm run deploy:monad
-
-# 5. Deploy to Sepolia
-npm run deploy:sepolia
+# Edit .env with your configuration
 ```
 
-### Usage Example
+### Environment Variables
 
-```typescript
-import { ProofGenerator, fetchSubscriptionData, submitProof } from 'veil402-proof-generator';
+Create `.env` in the root directory:
 
-// 1. Fetch subscription from Monad
-const subscription = await fetchSubscriptionData(
-    subscriptionId,
-    vaultAddress,
-    monadProvider,
-    secretNullifier
-);
+```env
+# Monad RPC
+MONAD_RPC_URL=https://testnet-rpc.monad.xyz
 
-// 2. Generate proof off-chain
-const generator = new ProofGenerator();
-await generator.initialize();
-const proof = await generator.generateProof(subscription);
+# Supabase
+SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_KEY=your_service_key
 
-// 3. Submit to Sepolia
-const receipt = await submitProof(proof, verifierAddress, sepoliaSigner);
-
-console.log('✅ Access verified!');
+# Contract Addresses (auto-populated after deployment)
+NEXT_PUBLIC_REGISTRY_ADDRESS=
+NEXT_PUBLIC_VAULT_ADDRESS=
+NEXT_PUBLIC_COMMITMENT_ADDRESS=
 ```
 
----
-
-## 📁 Project Structure
-
-```
-veil402/
-├── contracts/           # Solidity smart contracts
-│   ├── PrivacyDomainRegistry.sol
-│   ├── StealthSubscriptionVault.sol
-│   └── ZKAccessVerifier.sol
-│
-├── noir/               # PLONK circuit
-│   └── src/main.nr
-│
-├── lib/                # TypeScript proof generator
-│   └── src/index.ts
-│
-├── scripts/            # Deployment scripts
-│   └── deploy-crosschain.js
-│
-├── test/               # Contract tests
-│
-└── docs/               # Documentation
-    ├── CROSS_CHAIN_SETUP.md
-    ├── ZK_IMPLEMENTATION_GUIDE.md
-    └── ZK_QUICK_REFERENCE.md
-```
-
----
-
-## 🔐 How It Works
-
-### 1. User Pays Subscription (Monad)
-
-```solidity
-vault.paySubscription(
-    domainHash,
-    stealthAddress,  // Unique, unlinkable address
-    merchantId,
-    planId,
-    { value: price }
-);
-```
-
-Subscription is stored with a unique ID.
-
-### 2. Generate Zero-Knowledge Proof (Off-Chain)
-
-```typescript
-const proof = await generator.generateProof(subscription);
-```
-
-Proof asserts: **"I have a valid subscription for merchant X and plan Y"**
-
-Without revealing:
-- ❌ Wallet address
-- ❌ Payment details
-- ❌ Exact expiration date
-
-### 3. Verify Proof (Sepolia)
-
-```solidity
-verifier.verifyAccess(
-    proof,
-    proofHash,
-    merchantId,
-    planId,
-    currentEpoch,
-    nullifierHash
-);
-```
-
-Access granted if proof is valid! ✅
-
----
-
-## 📊 Performance
-
-| Operation | Time | Gas Cost |
-|-----------|------|----------|
-| Pay Subscription (Monad) | ~3s | ~100k |
-| Generate Proof (Off-chain) | 2-4s | 0 |
-| Verify Proof (Sepolia) | ~5s | ~280k |
-
-**Total flow**: ~10-15 seconds
-
----
-
-## 🧪 Testing
+### Deploy Contracts
 
 ```bash
-# Run contract tests
-npm test
+# Compile contracts
+npm run compile
 
-# Test with gas reporting
-npm run test:gas
-
-# Deploy to local network
-npm run node          # Terminal 1
-npm run deploy:local  # Terminal 2
+# Deploy to Monad testnet
+npm run deploy:monad
 ```
 
----
+### Run Frontend
 
-## 📚 Documentation
+```bash
+cd frontend
+npm run dev
+```
 
-- **[Cross-Chain Setup Guide](./docs/CROSS_CHAIN_SETUP.md)** - Complete setup instructions
-- **[ZK Implementation Guide](./docs/ZK_IMPLEMENTATION_GUIDE.md)** - Deep dive into zero-knowledge proofs
-- **[ZK Quick Reference](./docs/ZK_QUICK_REFERENCE.md)** - Visual diagrams and quick tips
+Visit `http://localhost:3000`
 
----
+### Run Indexer (Optional)
 
-## 🎯 Use Cases
+```bash
+# In a separate terminal
+node indexer/production-indexer.js
+```
 
-### Content Platforms
-- Private access to premium content
-- No user tracking
-- Subscription privacy
+## 📱 Farcaster Mini App
 
-### SaaS Applications
-- Anonymous API access
-- Privacy-preserving authentication
-- Compliance-friendly
+The VeilPay Farcaster mini app is live! Access it through:
 
-### Membership Sites
-- Private membership verification
-- No personal data collection
-- GDPR-compliant by design
+1. **Warpcast Developer Portal**: [warpcast.com/~/developers/mini-apps](https://warpcast.com/~/developers/mini-apps)
+2. **Share in Cast**: Paste `https://veil-pay1.vercel.app` in a Warpcast cast
+3. **Direct Link**: Open in Warpcast mobile app
 
----
+### Mini App Features
+- Connect with Farcaster wallet
+- Register privacy domains
+- Send/receive private payments
+- Scan for incoming payments
+- Premium x402 services
 
-## 🛠️ Technology Stack
+## 🔧 Technology Stack
 
-- **Smart Contracts**: Solidity 0.8.20
-- **ZK Proofs**: Noir + PLONK UltraPlonk
-- **Proof Generation**: TypeScript + Barretenberg
-- **Blockchain**: Monad (subscriptions) + Sepolia (verification)
-- **Development**: Hardhat, ethers.js
+### Blockchain
+- **Monad Testnet**: High-performance EVM-compatible chain
+- **Solidity**: Smart contract development
+- **Hardhat**: Development framework
+- **ethers.js v6**: Blockchain interaction
 
----
+### Frontend
+- **Next.js 14**: React framework with App Router
+- **TypeScript**: Type-safe development
+- **Wagmi v2**: React hooks for Ethereum
+- **Farcaster SDK**: Mini app integration
+- **TailwindCSS**: Utility-first CSS
 
-## 🔒 Security
+### Backend
+- **Supabase**: PostgreSQL database
+- **Node.js**: Indexer services
+- **x402 Protocol**: Payment-gated APIs
 
-### What's Private
-- User wallet addresses
-- Payment transactions
-- Subscription details
-- Access patterns
+## 📖 Usage Guide
 
-### What's Public
-- Merchant ID
-- Plan ID
-- Proof validity
-- Nullifier (prevents reuse)
+### 1. Register a Privacy Domain
 
-### Security Features
-- ✅ Nullifier tracking (prevents proof reuse)
-- ✅ Time-based expiration (prevents replay attacks)
-- ✅ Proof hash verification (prevents tampering)
-- ✅ Cross-chain isolation (data separation)
+```typescript
+// Navigate to "Register Domain"
+// Enter your desired domain name (e.g., "alice")
+// Click "Register Domain"
+// Approve the transaction
+```
 
----
+### 2. Send a Private Payment
 
-## 🚧 Roadmap
+```typescript
+// Navigate to "Send Payment"
+// Enter recipient's privacy domain (e.g., "bob.veil")
+// Enter amount and select plan
+// Click "Send Payment"
+// Approve the transaction
+```
 
-### Phase 1: Smart Contracts ✅
-- [x] PrivacyDomainRegistry
-- [x] StealthSubscriptionVault
-- [x] ZKAccessVerifier
+### 3. Scan for Payments
 
-### Phase 2: PLONK Proofs ✅
-- [x] Noir circuit
-- [x] TypeScript proof generator
-- [x] Cross-chain deployment
+```typescript
+// Navigate to "Scan Payments"
+// Select your domain
+// Click "Derive Private Keys" (sign message)
+// Click "Scan Database" to find payments
+// Or use "Priority Scan" for instant results (x402)
+```
 
-### Phase 3: Infrastructure (Next)
-- [ ] Off-chain indexer
-- [ ] API endpoints
-- [ ] SDK improvements
+### 4. Claim Payments
 
-### Phase 4: Frontend
-- [ ] User dashboard
-- [ ] Merchant portal
-- [ ] Mobile app
+```typescript
+// After scanning, unclaimed payments appear
+// Click "Claim" on any payment
+// Approve the transaction
+// Funds transferred to your wallet
+```
 
----
+## 🔐 Security
 
-## 🤝 Contributing
+- **Private Keys**: Never leave your device
+- **Stealth Addresses**: Unique per payment
+- **Zero-Knowledge**: Verify without revealing
+- **Self-Custodial**: You control your funds
 
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
+## 🛣️ Roadmap
 
----
+- [x] Core stealth address implementation
+- [x] Privacy domain registration
+- [x] Payment sending/receiving
+- [x] Payment scanning and claiming
+- [x] Farcaster mini app integration
+- [x] x402 premium services
+- [ ] Mobile app (iOS/Android)
+- [ ] Cross-chain support
+- [ ] Enhanced privacy features
+- [ ] DAO governance
 
 ## 📄 License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details
 
----
+## 🤝 Contributing
 
-## 🌟 Why veil402?
-
-**Privacy is a right, not a privilege.**
-
-veil402 makes privacy-preserving subscriptions accessible to everyone. No complex setup, no compromises on security, just pure privacy.
-
-**Build the future of private subscriptions with us!** 🔐✨
-
----
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📞 Support
 
-- 📖 [Documentation](./docs/)
-- 💬 [Discord](#)
-- 🐛 [Issues](https://github.com/yourusername/veil402/issues)
-- 🐦 [Twitter](#)
+- **GitHub Issues**: [Report bugs](https://github.com/Vaibhav-Rawat-cipher/VeilPay/issues)
+- **Documentation**: Coming soon
+- **Community**: Join our discussions
+
+## 🙏 Acknowledgments
+
+- Monad team for the high-performance blockchain
+- Farcaster for mini app platform
+- x402 protocol for payment-gated APIs
+- Open source community
 
 ---
 
-**Ready to deploy?** Check out the [Cross-Chain Setup Guide](./docs/CROSS_CHAIN_SETUP.md)!
+**Built with ❤️ for privacy-conscious users**
