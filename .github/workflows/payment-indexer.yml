@@ -1,0 +1,137 @@
+name: Payment Indexer
+
+on:
+  schedule:
+    # Run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  index-payments:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          npm install ethers@6.13.4
+          npm install @supabase/supabase-js
+
+      - name: Run indexer
+        env:
+          MONAD_RPC_URL: ${{ secrets.MONAD_RPC_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          NEXT_PUBLIC_VAULT_ADDRESS: ${{ secrets.NEXT_PUBLIC_VAULT_ADDRESS }}
+        run: |
+          # Create a one-time run version of the indexer
+          node -e "
+          const { ethers } = require('ethers');
+          const { createClient } = require('@supabase/supabase-js');
+
+          const CONFIG = {
+              RPC_URL: process.env.MONAD_RPC_URL || 'https://testnet-rpc.monad.xyz',
+              VAULT_ADDRESS: process.env.NEXT_PUBLIC_VAULT_ADDRESS,
+              BLOCK_CHUNK_SIZE: 50,
+              MAX_BLOCKS_PER_SCAN: 500
+          };
+
+          const supabase = createClient(
+              process.env.SUPABASE_URL,
+              process.env.SUPABASE_SERVICE_KEY
+          );
+
+          const VAULT_ABI = [
+              'event PaymentReceived(bytes32 indexed merchantId, uint256 indexed planId, address indexed stealthAddress, uint256 amount, uint256 duration, uint256 timestamp, bytes ephemeralPubKey)'
+          ];
+
+          async function getLastScannedBlock() {
+              const { data, error } = await supabase
+                  .from('indexer_state')
+                  .select('last_block_payments')
+                  .eq('id', 1)
+                  .single();
+              return data?.last_block_payments || 0;
+          }
+
+          async function updateLastScannedBlock(blockNumber) {
+              await supabase
+                  .from('indexer_state')
+                  .upsert({
+                      id: 1,
+                      last_block_payments: blockNumber,
+                      updated_at: new Date().toISOString()
+                  });
+          }
+
+          async function storePayment(event) {
+              const { merchantId, planId, stealthAddress, amount, duration, timestamp, ephemeralPubKey } = event.args;
+              const payment = {
+                  merchant_id: merchantId,
+                  plan_id: Number(planId),
+                  stealth_address: stealthAddress,
+                  amount: amount.toString(),
+                  duration: Number(duration),
+                  timestamp: Number(timestamp),
+                  ephemeral_pub_key: ethers.hexlify(ephemeralPubKey),
+                  block_number: event.blockNumber,
+                  transaction_hash: event.transactionHash,
+                  claimed: false
+              };
+              await supabase.from('payments').upsert(payment, { onConflict: 'transaction_hash' });
+              console.log(\`✓ Stored payment: \${event.transactionHash}\`);
+          }
+
+          async function scanForPayments(provider, vaultContract, fromBlock, toBlock) {
+              let currentBlock = fromBlock;
+              let totalPayments = 0;
+              while (currentBlock < toBlock) {
+                  const endBlock = Math.min(currentBlock + CONFIG.BLOCK_CHUNK_SIZE, toBlock);
+                  try {
+                      const filter = vaultContract.filters.PaymentReceived();
+                      const events = await vaultContract.queryFilter(filter, currentBlock, endBlock);
+                      for (const event of events) {
+                          await storePayment(event);
+                          totalPayments++;
+                      }
+                  } catch (error) {
+                      console.error(\`Error scanning blocks \${currentBlock}-\${endBlock}:\`, error.message);
+                  }
+                  currentBlock = endBlock + 1;
+                  await new Promise(resolve => setTimeout(resolve, 100));
+              }
+              return totalPayments;
+          }
+
+          async function run() {
+              console.log('🚀 GitHub Actions Indexer Starting...');
+              const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
+              const vaultContract = new ethers.Contract(CONFIG.VAULT_ADDRESS, VAULT_ABI, provider);
+              
+              const lastBlock = await getLastScannedBlock();
+              const currentBlock = await provider.getBlockNumber();
+              const fromBlock = Math.max(lastBlock + 1, currentBlock - CONFIG.MAX_BLOCKS_PER_SCAN);
+              const toBlock = currentBlock;
+
+              if (fromBlock <= toBlock) {
+                  console.log(\`🔍 Scanning blocks \${fromBlock} to \${toBlock}\`);
+                  const paymentsFound = await scanForPayments(provider, vaultContract, fromBlock, toBlock);
+                  await updateLastScannedBlock(toBlock);
+                  console.log(\`✅ Indexed \${paymentsFound} payment(s)\`);
+              } else {
+                  console.log('💤 No new blocks to scan');
+              }
+          }
+
+          run().catch(error => {
+              console.error('❌ Error:', error);
+              process.exit(1);
+          });
+          "
