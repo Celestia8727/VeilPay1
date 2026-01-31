@@ -29,7 +29,7 @@ jobs:
           MONAD_RPC_URL: ${{ secrets.MONAD_RPC_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          NEXT_PUBLIC_VAULT_ADDRESS: ${{ secrets.NEXT_PUBLIC_VAULT_ADDRESS }}
+          VAULT_ADDRESS: ${{ secrets.VAULT_ADDRESS }}
         run: |
           # Create a one-time run version of the indexer
           node -e "
@@ -38,7 +38,7 @@ jobs:
 
           const CONFIG = {
               RPC_URL: process.env.MONAD_RPC_URL || 'https://testnet-rpc.monad.xyz',
-              VAULT_ADDRESS: process.env.NEXT_PUBLIC_VAULT_ADDRESS,
+              VAULT_ADDRESS: process.env.VAULT_ADDRESS,
               BLOCK_CHUNK_SIZE: 50,
               MAX_BLOCKS_PER_SCAN: 500
           };
